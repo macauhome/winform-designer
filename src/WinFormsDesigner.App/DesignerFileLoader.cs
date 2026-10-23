@@ -13,9 +13,9 @@ public static class DesignerFileLoader
 {
     private static readonly Regex NamespaceRegex = new(@"^\s*namespace\s+([^\s{;]+)", RegexOptions.Compiled | RegexOptions.Multiline);
     private static readonly Regex ClassRegex = new(@"partial\s+class\s+([A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
-    private static readonly Regex NewControlRegex = new(@"(?<![.\w])(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*new\s+([\w\.\[\],\s<>]+)\s*\(\s*\)\s*;", RegexOptions.Compiled);
     private static readonly Regex PropertyAssignRegex = new(@"(?<![.\w])(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*;", RegexOptions.Compiled);
-    private static readonly Regex ControlsAddRegex = new(@"(?<![.\w])(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)?\s*\.?\s*Controls\.Add\s*\(\s*(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)(?:\s*,[^)]*)?\)\s*;", RegexOptions.Compiled);
+    private static readonly Regex NewControlRegex = new(@"(?<![.\w])(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*new\s+([\w\.\[\],\s<>]+)\s*\(\s*\)\s*;", RegexOptions.Compiled);
+    private static readonly Regex ControlsAddRegex = new(@"(?<![.\w])(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)?\s*\.?\s*Controls\.Add\s*\(\s*(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)(?:\s*,\s*(\d+)\s*,\s*(\d+))?\s*\)\s*;", RegexOptions.Compiled);
     private static readonly Regex ControlsAddRangeRegex = new(@"(?<![.\w])(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)?\s*\.?\s*Controls\.AddRange\s*\(\s*new\s+[\w\.\[\],\s]+?\{([\s\S]*?)\}\s*\)\s*;", RegexOptions.Compiled);
     private static readonly Regex ToolStripItemsAddRegex = new(@"(?<![.\w])(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)?\s*\.?\s*(?:Items|DropDownItems)\.Add\s*\(\s*(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)(?:\s*,[^)]*)?\)\s*;", RegexOptions.Compiled);
     private static readonly Regex ToolStripItemsAddRangeRegex = new(@"(?<![.\w])(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)?\s*\.?\s*(?:Items|DropDownItems)\.AddRange\s*\(\s*new\s+[\w\.\[\],\s]+?\{([\s\S]*?)\}\s*\)\s*;", RegexOptions.Compiled);
@@ -196,6 +196,19 @@ private static readonly Regex ColorSystemRegex = new(@"^System\.Drawing\.SystemC
         foreach (Match m in ControlsAddRegex.Matches(source))
         {
             AddChild(m.Groups[1].Value, m.Groups[2].Value);
+
+            if (fieldToNode.TryGetValue(m.Groups[2].Value, out var addedChild))
+            {
+                if (m.Groups[3].Success && int.TryParse(m.Groups[3].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var column))
+                {
+                    addedChild.TableColumn = column;
+                }
+
+                if (m.Groups[4].Success && int.TryParse(m.Groups[4].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var row))
+                {
+                    addedChild.TableRow = row;
+                }
+            }
         }
 
         foreach (Match m in ControlsAddRangeRegex.Matches(source))

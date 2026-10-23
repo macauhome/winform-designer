@@ -284,7 +284,15 @@ public sealed class CSharpFormGenerator
                 continue;
             }
 
-            lines.Add(("Controls", $"            this.{field}.Controls.Add(this.{fieldNames[child]});"));
+            if (typeof(System.Windows.Forms.TableLayoutPanel).IsAssignableFrom(node.ControlType)
+                && (child.TableColumn.HasValue || child.TableRow.HasValue))
+            {
+                lines.Add(("Controls", $"            this.{field}.Controls.Add(this.{fieldNames[child]}, {child.TableColumn ?? 0}, {child.TableRow ?? 0});"));
+            }
+            else
+            {
+                lines.Add(("Controls", $"            this.{field}.Controls.Add(this.{fieldNames[child]});"));
+            }
         }
 
         var stripItems = node.Children.Where(c => IsToolStripItem(c.ControlType)).ToList();

@@ -92,6 +92,18 @@ public sealed class DesignNode
     /// <summary>Parent node, or <c>null</c> for the root.</summary>
     public DesignNode? Parent { get; set; }
 
+    /// <summary>
+    /// Column index when this node is hosted by a <see cref="System.Windows.Forms.TableLayoutPanel"/>,
+    /// or <c>null</c> when the default placement applies.
+    /// </summary>
+    public int? TableColumn { get; set; }
+
+    /// <summary>
+    /// Row index when this node is hosted by a <see cref="System.Windows.Forms.TableLayoutPanel"/>,
+    /// or <c>null</c> when the default placement applies.
+    /// </summary>
+    public int? TableRow { get; set; }
+
     /// <summary>Child nodes. Index 0 is the front-most child.</summary>
     public List<DesignNode> Children { get; } = new();
 

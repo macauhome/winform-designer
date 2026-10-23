@@ -930,7 +930,15 @@ public sealed class DesignSession
             return;
         }
 
-        parent.Controls.Add(childLive);
+        if (parent is System.Windows.Forms.TableLayoutPanel tableLayout
+            && (child.TableColumn.HasValue || child.TableRow.HasValue))
+        {
+            tableLayout.Controls.Add(childLive, child.TableColumn ?? 0, child.TableRow ?? 0);
+        }
+        else
+        {
+            parent.Controls.Add(childLive);
+        }
     }
 
     /// <summary>
@@ -1095,6 +1103,8 @@ public sealed class DesignSession
     private static DesignNode CloneSubtree(DesignNode node)
     {
         var clone = new DesignNode(node.ControlType, node.Name);
+        clone.TableColumn = node.TableColumn;
+        clone.TableRow = node.TableRow;
         foreach (var (key, value) in node.Properties.Values)
         {
             clone.Properties.SetValue(key, PropertyBag.CloneValue(value));

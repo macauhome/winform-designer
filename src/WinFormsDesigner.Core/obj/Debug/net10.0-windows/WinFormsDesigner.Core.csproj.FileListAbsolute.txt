@@ -9,3 +9,4 @@ D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.Core\obj\Debug\net10.
 D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.Core\obj\Debug\net10.0-windows\refint\WinFormsDesigner.Core.dll
 D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.Core\obj\Debug\net10.0-windows\WinFormsDesigner.Core.pdb
 D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.Core\obj\Debug\net10.0-windows\ref\WinFormsDesigner.Core.dll
+D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.Core\obj\Debug\net10.0-windows\WinFormsDesigner.Core.sourcelink.json

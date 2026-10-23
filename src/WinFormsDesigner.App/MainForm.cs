@@ -375,11 +375,12 @@ public sealed class MainForm : Form
 
     private void OnControlRequested(object? sender, ToolboxEntryEventArgs e)
     {
-        var root = _session.RootForm;
+        var parentNode = _session.GetInsertionParent();
+        var parent = _session.GetLive(parentNode) ?? _session.RootForm;
         var size = e.Entry.DefaultSize;
         var location = new Point(
-            Math.Max(0, (root.ClientSize.Width - size.Width) / 2),
-            Math.Max(0, (root.ClientSize.Height - size.Height) / 2));
+            Math.Max(0, (parent.ClientSize.Width - size.Width) / 2),
+            Math.Max(0, (parent.ClientSize.Height - size.Height) / 2));
 
         _session.AddControl(e.Entry.ControlType, location);
         FocusSurface();

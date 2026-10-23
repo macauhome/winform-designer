@@ -16,3 +16,4 @@ D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\obj\Debug\net10.0
 D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\obj\Debug\net10.0-windows\WinFormsDesigner.pdb
 D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\obj\Debug\net10.0-windows\WinFormsDesigner.App.genruntimeconfig.cache
 D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\obj\Debug\net10.0-windows\ref\WinFormsDesigner.dll
+D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\obj\Debug\net10.0-windows\WinFormsDesigner.App.sourcelink.json

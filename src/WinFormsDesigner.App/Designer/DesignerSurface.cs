@@ -7,8 +7,8 @@ using WinFormsDesigner.Core.Reflection;
 namespace WinFormsDesigner.App.Designer;
 
 /// <summary>
-/// Hosts the live form, routes input from its child controls, and draws the design
-/// adornments over the form.
+/// Paints the document's live control tree onto a scrollable canvas and applies canvas
+/// gestures back to the design session.
 /// </summary>
 public sealed class DesignerSurface : Panel
 {
@@ -16,11 +16,11 @@ public sealed class DesignerSurface : Panel
     private const int GridSize = 8;
     private const int HandleSize = 7;
 
-    private readonly CanvasPanel _canvas = new();
-    private readonly AdornmentLayer _adornments = new();
-    private readonly HashSet<Control> _dropTargets = [];
+    private readonly DesignCanvas _canvas = new();
 
     private DesignSession? _session;
+    private Bitmap? _renderedForm;
+    private Point _formLocation = new(CanvasMargin, CanvasMargin);
     private GestureMode _gestureMode;
     private DesignNode? _gestureNode;
     private Control? _gestureControl;
@@ -42,17 +42,14 @@ public sealed class DesignerSurface : Panel
         _canvas.Location = Point.Empty;
         _canvas.Size = ClientSize;
         _canvas.AllowDrop = true;
-
-        _adornments.Location = Point.Empty;
-        _adornments.Size = _canvas.ClientSize;
-        _adornments.Surface = this;
-        _adornments.AllowDrop = true;
-
-        _canvas.Controls.Add(_adornments);
+        _canvas.Paint += OnCanvasPaint;
+        _canvas.MouseDown += OnCanvasMouseDown;
+        _canvas.MouseMove += OnCanvasMouseMove;
+        _canvas.MouseUp += OnCanvasMouseUp;
+        _canvas.MouseCaptureChanged += OnMouseCaptureChanged;
+        _canvas.DragEnter += OnDesignerDragEnter;
+        _canvas.DragDrop += OnDesignerDragDrop;
         Controls.Add(_canvas);
-        _canvas.BringToFront();
-
-        MouseCaptureChanged += OnMouseCaptureChanged;
     }
 
     /// <summary>The session whose live form is displayed on the surface.</summary>
@@ -67,31 +64,25 @@ public sealed class DesignerSurface : Panel
                 return;
             }
 
-            RemoveDropTargets();
             if (_session is not null)
             {
                 _session.StructureChanged -= OnSessionStructureChanged;
                 _session.Changed -= OnSessionChanged;
                 _session.SelectionChanged -= OnSessionChanged;
                 _session.RootForm.SizeChanged -= OnRootFormSizeChanged;
-                _canvas.Controls.Remove(_session.RootForm);
             }
 
             _session = value;
+            _formLocation = new Point(CanvasMargin, CanvasMargin);
             if (_session is not null)
             {
-                _session.RootForm.Location = new Point(CanvasMargin, CanvasMargin);
                 _session.RootForm.SizeChanged += OnRootFormSizeChanged;
                 _session.StructureChanged += OnSessionStructureChanged;
                 _session.Changed += OnSessionChanged;
                 _session.SelectionChanged += OnSessionChanged;
-                _canvas.Controls.Add(_session.RootForm);
-                _session.RootForm.BringToFront();
             }
 
-            _canvas.Controls.SetChildIndex(_adornments, 0);
             ResizeCanvas();
-            ConfigureDropTargets();
             RefreshDesignerVisuals();
         }
     }
@@ -109,42 +100,45 @@ public sealed class DesignerSurface : Panel
 
     private bool IsPointerCaptured => _gestureMode != GestureMode.None;
 
-    internal void PaintAdornments(Graphics graphics)
+    private void PaintDesign(Graphics graphics)
     {
-        if (_session is null || _session.SelectedNode is not { } selected)
+        if (_session is null)
         {
             return;
         }
 
-        var control = _session.GetLive(selected);
-        if (control is null || control.IsDisposed)
+        var root = _session.RootForm;
+        _session.EnsureHandles();
+        if (_renderedForm is null || _renderedForm.Size != root.Size)
         {
-            return;
+            _renderedForm?.Dispose();
+            _renderedForm = new Bitmap(root.Width, root.Height);
+            root.DrawToBitmap(_renderedForm, new Rectangle(Point.Empty, _renderedForm.Size));
         }
 
-        var bounds = ControlBoundsOnCanvas(control);
-        bounds.Inflate(1, 1);
+        graphics.DrawImageUnscaled(_renderedForm, _formLocation);
 
-        using var selectionPen = new Pen(Color.RoyalBlue, 1) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
-        graphics.DrawRectangle(selectionPen, bounds);
-
-        using var handleBrush = new SolidBrush(Color.White);
-        using var handlePen = new Pen(Color.RoyalBlue);
-        foreach (var handle in GetHandleBounds(bounds))
+        if (_session.SelectedNode is { } selected && _session.GetLive(selected) is { } control)
         {
-            graphics.FillRectangle(handleBrush, handle);
-            graphics.DrawRectangle(handlePen, handle);
-        }
+            var bounds = ControlBoundsOnCanvas(control);
+            bounds.Inflate(1, 1);
 
-        if (ShowAlignmentGuides && IsPointerCaptured && _gestureMode == GestureMode.Move)
-        {
-            PaintAlignmentGuides(graphics, bounds, selected);
-        }
-    }
+            using var selectionPen = new Pen(Color.RoyalBlue, 1) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
+            graphics.DrawRectangle(selectionPen, bounds);
 
-    internal void PaintScrollBars(Graphics graphics)
-    {
-        // The surface uses the native scroll bars provided by ScrollableControl.
+            using var handleBrush = new SolidBrush(Color.White);
+            using var handlePen = new Pen(Color.RoyalBlue);
+            foreach (var handle in GetHandleBounds(bounds))
+            {
+                graphics.FillRectangle(handleBrush, handle);
+                graphics.DrawRectangle(handlePen, handle);
+            }
+
+            if (ShowAlignmentGuides && IsPointerCaptured && _gestureMode == GestureMode.Move)
+            {
+                PaintAlignmentGuides(graphics, bounds, selected);
+            }
+        }
     }
 
     protected override void OnSizeChanged(EventArgs e)
@@ -162,11 +156,61 @@ public sealed class DesignerSurface : Panel
         }
     }
 
+    private void OnCanvasPaint(object? sender, PaintEventArgs e)
+    {
+        PaintGrid(e.Graphics, _canvas.ClientRectangle);
+        PaintDesign(e.Graphics);
+    }
+
+    private void PaintGrid(Graphics graphics, Rectangle bounds)
+    {
+        using var brush = new SolidBrush(Color.FromArgb(0xD6, 0xD6, 0xD6));
+        for (var y = GridSize; y < bounds.Height; y += GridSize * 2)
+        {
+            for (var x = GridSize; x < bounds.Width; x += GridSize * 2)
+            {
+                graphics.FillRectangle(brush, x, y, 1, 1);
+            }
+        }
+    }
+
+    private void OnCanvasMouseDown(object? sender, MouseEventArgs e)
+    {
+        if (e.Button != MouseButtons.Left)
+        {
+            return;
+        }
+
+        Focus();
+        BeginGesture(e.Location);
+    }
+
+    private void OnCanvasMouseMove(object? sender, MouseEventArgs e)
+    {
+        PointerMoved?.Invoke(this, new DesignerPointEventArgs(PointToClient(_canvas.PointToScreen(e.Location))));
+        if (IsPointerCaptured)
+        {
+            UpdateGesture(e.Location);
+        }
+        else
+        {
+            Cursor.Current = CursorAt(e.Location);
+        }
+    }
+
+    private void OnCanvasMouseUp(object? sender, MouseEventArgs e)
+    {
+        if (e.Button == MouseButtons.Left && IsPointerCaptured)
+        {
+            EndGesture(e.Location, commit: true);
+        }
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
-            RemoveDropTargets();
+            _renderedForm?.Dispose();
             if (_session is not null)
             {
                 _session.StructureChanged -= OnSessionStructureChanged;
@@ -179,7 +223,7 @@ public sealed class DesignerSurface : Panel
         base.Dispose(disposing);
     }
 
-    private void BeginGesture(Point surfacePoint)
+    private void BeginGesture(Point canvasPoint)
     {
         if (_session is null)
         {
@@ -190,15 +234,15 @@ public sealed class DesignerSurface : Panel
         var selectedControl = selected is null ? null : _session.GetLive(selected);
         if (selected is not null && selectedControl is not null)
         {
-            var edges = GetResizeEdges(ControlBoundsOnCanvas(selectedControl), ToCanvasPoint(surfacePoint));
+            var edges = GetResizeEdges(ControlBoundsOnCanvas(selectedControl), canvasPoint);
             if (edges != ResizeEdges.None)
             {
-                StartGesture(selected, selectedControl, edges, surfacePoint);
+                StartGesture(selected, selectedControl, edges, canvasPoint);
                 return;
             }
         }
 
-        var formPoint = _session.RootForm.PointToClient(PointToScreen(surfacePoint));
+        var formPoint = new Point(canvasPoint.X - _formLocation.X, canvasPoint.Y - _formLocation.Y);
         var hit = _session.HitTest(formPoint);
         if (hit is null && _session.RootForm.ClientRectangle.Contains(formPoint))
         {
@@ -216,31 +260,30 @@ public sealed class DesignerSurface : Panel
         var hitControl = _session.GetLive(hit);
         if (hit.Parent is not null && hitControl is not null)
         {
-            StartGesture(hit, hitControl, ResizeEdges.None, surfacePoint);
+            StartGesture(hit, hitControl, ResizeEdges.None, canvasPoint);
         }
         else if (hitControl is not null)
         {
-            var rootEdges = GetResizeEdges(ControlBoundsOnCanvas(hitControl), ToCanvasPoint(surfacePoint));
-            if (rootEdges != ResizeEdges.None)
-            {
-                StartGesture(hit, hitControl, rootEdges, surfacePoint);
-            }
+            var rootEdges = GetResizeEdges(ControlBoundsOnCanvas(hitControl), canvasPoint);
+            StartGesture(hit, hitControl, rootEdges, canvasPoint);
         }
         else
         {
-            Cursor.Current = CursorAt(surfacePoint);
+            Cursor.Current = CursorAt(canvasPoint);
         }
     }
 
-    private void StartGesture(DesignNode node, Control control, ResizeEdges edges, Point surfacePoint)
+    private void StartGesture(DesignNode node, Control control, ResizeEdges edges, Point canvasPoint)
     {
         _gestureNode = node;
         _gestureControl = control;
-        _gestureStartBounds = control.Bounds;
-        _gestureStartPointer = ToCanvasPoint(surfacePoint);
+        _gestureStartBounds = node.Parent is null
+            ? new Rectangle(_formLocation, control.Size)
+            : control.Bounds;
+        _gestureStartPointer = canvasPoint;
         _resizeEdges = edges;
         _gestureMode = edges == ResizeEdges.None ? GestureMode.Move : GestureMode.Resize;
-        Capture = true;
+        _canvas.Capture = true;
         Cursor = CursorFor(edges);
         Cursor.Current = Cursor;
     }
@@ -262,6 +305,12 @@ public sealed class DesignerSurface : Panel
             {
                 bounds.X = Snap(bounds.X);
                 bounds.Y = Snap(bounds.Y);
+            }
+
+            if (ReferenceEquals(_gestureControl, _session?.RootForm))
+            {
+                bounds.X = Math.Max(CanvasMargin, bounds.X);
+                bounds.Y = Math.Max(CanvasMargin, bounds.Y);
             }
         }
         else
@@ -328,56 +377,79 @@ public sealed class DesignerSurface : Panel
         }
 
         var control = _gestureControl;
-        var parent = control.Parent;
-        var previousBounds = control.Bounds;
         var oldCanvasBounds = ControlBoundsOnCanvas(control);
-        control.Bounds = bounds;
+        if (ReferenceEquals(control, _session?.RootForm))
+        {
+            if (_gestureMode == GestureMode.Move)
+            {
+                _formLocation = bounds.Location;
+                ResizeCanvas();
+            }
+            else
+            {
+                control.ClientSize = bounds.Size;
+            }
+        }
+        else
+        {
+            control.Bounds = bounds;
+        }
         var newCanvasBounds = ControlBoundsOnCanvas(control);
 
         var dirtyBounds = Rectangle.Union(oldCanvasBounds, newCanvasBounds);
         dirtyBounds.Inflate(HandleSize + 2, HandleSize + 2);
-        _canvas.Invalidate(dirtyBounds, invalidateChildren: true);
-        _adornments.Invalidate(dirtyBounds);
-        if (parent is not null)
-        {
-            parent.Invalidate(Rectangle.Union(previousBounds, bounds), invalidateChildren: true);
-            parent.Update();
-        }
-
-        control.Invalidate(invalidateChildren: true);
-        control.Update();
-        _adornments.Update();
+        InvalidateRenderedForm();
+        _canvas.Invalidate(dirtyBounds);
     }
 
-    private void EndGesture(Point surfacePoint, bool commit)
+    private void EndGesture(Point canvasPoint, bool commit)
     {
         if (commit)
         {
-            UpdateGesture(ToCanvasPoint(surfacePoint));
+            UpdateGesture(canvasPoint);
         }
 
         var node = _gestureNode;
         var control = _gestureControl;
-        var finalBounds = control?.Bounds ?? Rectangle.Empty;
+        var gestureMode = _gestureMode;
+        var finalBounds = control is not null && ReferenceEquals(control, _session?.RootForm)
+            ? new Rectangle(_formLocation, control.Size)
+            : control?.Bounds ?? Rectangle.Empty;
         var originalBounds = _gestureStartBounds;
 
         _gestureMode = GestureMode.None;
         _gestureNode = null;
         _gestureControl = null;
         _resizeEdges = ResizeEdges.None;
-        Capture = false;
+        _canvas.Capture = false;
         Cursor = Cursors.Default;
         Cursor.Current = Cursors.Default;
 
         if (control is not null)
         {
-            if (commit && node is not null && _session is not null)
+            if (commit && node is not null && _session is not null
+                && !(ReferenceEquals(control, _session.RootForm) && gestureMode == GestureMode.Move))
             {
                 _session.CommitBounds(node, originalBounds, finalBounds);
             }
             else
             {
-                control.Bounds = originalBounds;
+                if (ReferenceEquals(control, _session?.RootForm))
+                {
+                    if (commit)
+                    {
+                        control.ClientSize = finalBounds.Size;
+                    }
+                    else
+                    {
+                        _formLocation = originalBounds.Location;
+                        control.ClientSize = originalBounds.Size;
+                    }
+                }
+                else
+                {
+                    control.Bounds = originalBounds;
+                }
             }
         }
 
@@ -386,63 +458,17 @@ public sealed class DesignerSurface : Panel
 
     private void OnMouseCaptureChanged(object? sender, EventArgs e)
     {
-        if (!Capture && IsPointerCaptured)
+        if (!_canvas.Capture && IsPointerCaptured)
         {
-            EndGesture(PointToClient(MousePosition), commit: false);
+            EndGesture(_canvas.PointToClient(MousePosition), commit: false);
         }
-    }
-
-    private void HandlePointerMove(Point surfacePoint)
-    {
-        PointerMoved?.Invoke(this, new DesignerPointEventArgs(surfacePoint));
-
-        if (IsPointerCaptured)
-        {
-            UpdateGesture(ToCanvasPoint(surfacePoint));
-        }
-        else
-        {
-            Cursor.Current = CursorAt(surfacePoint);
-        }
-    }
-
-    private void OnDesignerMouseDown(object? sender, MouseEventArgs e)
-    {
-        if (e.Button != MouseButtons.Left || sender is not Control target)
-        {
-            return;
-        }
-
-        var surfacePoint = PointToClient(target.PointToScreen(e.Location));
-        BeginGesture(surfacePoint);
-    }
-
-    private void OnDesignerMouseMove(object? sender, MouseEventArgs e)
-    {
-        if (sender is not Control target)
-        {
-            return;
-        }
-
-        HandlePointerMove(PointToClient(target.PointToScreen(e.Location)));
-    }
-
-    private void OnDesignerMouseUp(object? sender, MouseEventArgs e)
-    {
-        if (e.Button != MouseButtons.Left || !IsPointerCaptured || sender is not Control target)
-        {
-            return;
-        }
-
-        var surfacePoint = PointToClient(target.PointToScreen(e.Location));
-        EndGesture(surfacePoint, commit: true);
     }
 
     private Cursor CursorAt(Point surfacePoint)
     {
         if (_session?.SelectedNode is { } selected && _session.GetLive(selected) is { } control)
         {
-            var edges = GetResizeEdges(ControlBoundsOnCanvas(control), ToCanvasPoint(surfacePoint));
+            var edges = GetResizeEdges(ControlBoundsOnCanvas(control), surfacePoint);
             if (edges != ResizeEdges.None)
             {
                 return CursorFor(edges);
@@ -521,15 +547,16 @@ public sealed class DesignerSurface : Panel
 
     private Rectangle ControlBoundsOnCanvas(Control control)
     {
-        var parent = control.Parent;
-        var location = parent is null
-            ? _canvas.PointToClient(control.PointToScreen(Point.Empty))
-            : _canvas.PointToClient(parent.PointToScreen(control.Location));
-        return new Rectangle(location, control.Size);
-    }
+        var x = _formLocation.X;
+        var y = _formLocation.Y;
+        for (var current = control; current is not null && !ReferenceEquals(current, _session?.RootForm); current = current.Parent)
+        {
+            x += current.Left;
+            y += current.Top;
+        }
 
-    private Point ToCanvasPoint(Point surfacePoint)
-        => _canvas.PointToClient(PointToScreen(surfacePoint));
+        return new Rectangle(x, y, control.Width, control.Height);
+    }
 
     private int Snap(int value)
         => (int)Math.Round(value / (double)GridSize, MidpointRounding.AwayFromZero) * GridSize;
@@ -565,71 +592,23 @@ public sealed class DesignerSurface : Panel
     private void ResizeCanvas()
     {
         var root = _session?.RootForm;
-        var width = Math.Max(ClientSize.Width, (root?.Right ?? 0) + CanvasMargin);
-        var height = Math.Max(ClientSize.Height, (root?.Bottom ?? 0) + CanvasMargin);
+        var width = Math.Max(ClientSize.Width, _formLocation.X + (root?.Width ?? 0) + CanvasMargin);
+        var height = Math.Max(ClientSize.Height, _formLocation.Y + (root?.Height ?? 0) + CanvasMargin);
         _canvas.Size = new Size(Math.Max(1, width), Math.Max(1, height));
         AutoScrollMinSize = _canvas.Size;
-        _adornments.Size = _canvas.ClientSize;
         RefreshDesignerVisuals();
     }
 
     private void RefreshDesignerVisuals()
     {
-        _canvas.Invalidate(true);
-        _adornments.Invalidate();
-        _session?.RootForm.Invalidate(true);
+        InvalidateRenderedForm();
+        _canvas.Invalidate();
     }
 
-    private void ConfigureDropTargets()
+    private void InvalidateRenderedForm()
     {
-        RemoveDropTargets();
-        WireDropTarget(this);
-        WireDropTarget(_canvas);
-        WireDropTarget(_adornments);
-
-        if (_session is not null)
-        {
-            WireControlTree(_session.RootForm);
-        }
-    }
-
-    private void WireControlTree(Control control)
-    {
-        WireDropTarget(control);
-        foreach (Control child in control.Controls)
-        {
-            WireControlTree(child);
-        }
-    }
-
-    private void WireDropTarget(Control control)
-    {
-        if (!_dropTargets.Add(control))
-        {
-            return;
-        }
-
-        control.AllowDrop = true;
-        control.DragEnter += OnDesignerDragEnter;
-        control.DragDrop += OnDesignerDragDrop;
-        control.MouseDown += OnDesignerMouseDown;
-        control.MouseMove += OnDesignerMouseMove;
-        control.MouseUp += OnDesignerMouseUp;
-    }
-
-    private void RemoveDropTargets()
-    {
-        foreach (var control in _dropTargets)
-        {
-            control.AllowDrop = false;
-            control.DragEnter -= OnDesignerDragEnter;
-            control.DragDrop -= OnDesignerDragDrop;
-            control.MouseDown -= OnDesignerMouseDown;
-            control.MouseMove -= OnDesignerMouseMove;
-            control.MouseUp -= OnDesignerMouseUp;
-        }
-
-        _dropTargets.Clear();
+        _renderedForm?.Dispose();
+        _renderedForm = null;
     }
 
     private void OnDesignerDragEnter(object? sender, DragEventArgs e)
@@ -645,13 +624,20 @@ public sealed class DesignerSurface : Panel
         }
 
         var screenPoint = new Point(e.X, e.Y);
-        var formPoint = _session.RootForm.PointToClient(screenPoint);
+        var canvasPoint = _canvas.PointToClient(screenPoint);
+        var formPoint = new Point(canvasPoint.X - CanvasMargin, canvasPoint.Y - CanvasMargin);
         var hitNode = _session.HitTest(formPoint);
         var parentNode = hitNode is not null && CanContainControls(hitNode.ControlType)
             ? hitNode
             : hitNode?.Parent ?? _session.Document.Root;
-        var parentControl = _session.GetLive(parentNode) ?? _session.RootForm;
-        var location = parentControl.PointToClient(screenPoint);
+        var location = formPoint;
+        for (var current = parentNode; current is not null && !ReferenceEquals(current, _session.Document.Root); current = current.Parent)
+        {
+            if (_session.GetLive(current) is { } parent)
+            {
+                location.Offset(-parent.Left, -parent.Top);
+            }
+        }
 
         _session.Select(parentNode);
         _session.AddControl(controlType, new Point(Math.Max(0, location.X), Math.Max(0, location.Y)));
@@ -681,10 +667,15 @@ public sealed class DesignerSurface : Panel
             || typeof(FlowLayoutPanel).IsAssignableFrom(type)
             || typeof(SplitContainer).IsAssignableFrom(type);
 
-    private void OnRootFormSizeChanged(object? sender, EventArgs e) => ResizeCanvas();
+    private void OnRootFormSizeChanged(object? sender, EventArgs e)
+    {
+        InvalidateRenderedForm();
+        ResizeCanvas();
+    }
+
     private void OnSessionStructureChanged(object? sender, EventArgs e)
     {
-        ConfigureDropTargets();
+        InvalidateRenderedForm();
         ResizeCanvas();
     }
 
@@ -711,25 +702,15 @@ public sealed class DesignerSurface : Panel
         LeftBottom = Left | Bottom,
     }
 
-    private sealed class CanvasPanel : Panel
+    private sealed class DesignCanvas : Control
     {
-        public CanvasPanel()
+        public DesignCanvas()
         {
             BackColor = Color.FromArgb(0xF0, 0xF0, 0xF0);
-            SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-        }
-
-        protected override void OnPaintBackground(PaintEventArgs e)
-        {
-            base.OnPaintBackground(e);
-            using var brush = new SolidBrush(Color.FromArgb(0xD6, 0xD6, 0xD6));
-            for (var y = GridSize; y < Height; y += GridSize * 2)
-            {
-                for (var x = GridSize; x < Width; x += GridSize * 2)
-                {
-                    e.Graphics.FillRectangle(brush, x, y, 1, 1);
-                }
-            }
+            SetStyle(
+                ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint
+                    | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw,
+                true);
         }
     }
 }

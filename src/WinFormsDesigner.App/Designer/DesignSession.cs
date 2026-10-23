@@ -122,16 +122,32 @@ public sealed class DesignSession
     /// <summary>Selects the live control under the given point, if any.</summary>
     public DesignNode? HitTest(Point formPoint)
     {
-        var target = RootForm.GetChildAtPoint(formPoint);
-        while (target is not null)
+        if (!RootForm.ClientRectangle.Contains(formPoint))
         {
-            var node = GetNode(target);
-            if (node is not null)
+            return null;
+        }
+
+        return HitTestChildren(Document.Root, formPoint) ?? Document.Root;
+    }
+
+    private DesignNode? HitTestChildren(DesignNode parentNode, Point pointInParent)
+    {
+        for (var index = 0; index < parentNode.Children.Count; index++)
+        {
+            var childNode = parentNode.Children[index];
+            if (childNode.Properties.TryGetValue("Visible", out var visible) && visible is false)
             {
-                return node;
+                continue;
             }
 
-            target = target.Parent;
+            var child = GetLive(childNode);
+            if (child is null || !child.Bounds.Contains(pointInParent))
+            {
+                continue;
+            }
+
+            var childPoint = new Point(pointInParent.X - child.Left, pointInParent.Y - child.Top);
+            return HitTestChildren(childNode, childPoint) ?? childNode;
         }
 
         return null;
@@ -147,7 +163,7 @@ public sealed class DesignSession
     /// </summary>
     public DesignNode AddControl(Type controlType, Point locationInParent)
     {
-        var parent = DetermineParent();
+        var parent = GetInsertionParent();
         var entry = ControlTypeRegistry.Find(controlType);
 
         var node = new DesignNode(
@@ -515,7 +531,7 @@ public sealed class DesignSession
             return;
         }
 
-        var parent = DetermineParent();
+        var parent = GetInsertionParent();
         PushUndo();
 
         var offset = new Point(10, 10);
@@ -749,7 +765,32 @@ public sealed class DesignSession
     // Live tree
     // ---------------------------------------------------------------------
 
-    /// <summary>Rebuilds the live control tree from the document.</summary>
+    /// <summary>
+    /// Forces the creation of window handles for the root form and every descendant control so
+    /// that <see cref="Control.DrawToBitmap"/> renders the whole live tree.
+    /// </summary>
+    public void EnsureHandles()
+    {
+        EnsureHandles(RootForm);
+    }
+
+    private static void EnsureHandles(Control control)
+    {
+        try
+        {
+            _ = control.Handle;
+        }
+        catch
+        {
+            // A control that refuses to create its handle is simply not rendered.
+        }
+
+        foreach (Control child in control.Controls)
+        {
+            EnsureHandles(child);
+        }
+    }
+
     public void RebuildLiveTree()
     {
         _live.Clear();
@@ -775,6 +816,7 @@ public sealed class DesignSession
         }
 
         RootForm.ResumeLayout(true);
+        EnsureHandles(RootForm);
         ResolveReferences();
         StructureChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -929,7 +971,8 @@ public sealed class DesignSession
     // Helpers
     // ---------------------------------------------------------------------
 
-    private DesignNode DetermineParent()
+    /// <summary>Returns the node that receives a newly inserted control.</summary>
+    public DesignNode GetInsertionParent()
     {
         if (SelectedNode is null)
         {

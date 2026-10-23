@@ -98,8 +98,7 @@ src/WinFormsDesigner.App/        The designer application
 | --- | --- |
 | `MainForm.cs` | Menu, toolbar, status bar and the three pane layout. |
 | `Designer/DesignSession.cs` | Owns the document, the live control tree, the selection and the undo history. |
-| `Designer/DesignerSurface.cs` | The design surface: painting, hit testing, pointer input, dragging, resizing and guides. |
-| `Designer/AdornmentLayer.cs` | Transparent overlay that draws the selection adornments. |
+| `Designer/DesignerSurface.cs` | Scrollable model-painted canvas, hit testing, pointer input, dragging, resizing and guides. |
 | `Toolbox/ToolboxPanel.cs` | The grouped toolbox list and the drag payload. |
 | `Toolbox/GlyphFactory.cs` | Draws the toolbox icons at runtime. |
 | `Properties/PropertyGridView.cs` | The property grid. |
@@ -109,11 +108,14 @@ src/WinFormsDesigner.App/        The designer application
 
 ## How it works
 
-**The document is the single source of truth.** The live controls on the surface are a
-projection of it. Editing a property writes the value into the document and applies it to
-the live control; a change made on the live control is read back into the document. Only
-non default values are stored, so the generated code stays as small as the one Visual
-Studio produces.
+**The document is the single source of truth.** The designer renders the session's control
+tree into a bitmap on a custom-painted canvas; live controls are not child windows of the
+canvas. Pointer hit testing and gestures are handled by the canvas and applied to the
+session. The root form can be repositioned on the canvas for workspace layout; this view
+position is not part of the generated form. New controls are centered within the selected
+insertion container. Editing a property writes the value into the document and applies it
+to the live control tree. Only non-default values are stored, so the generated code stays
+as small as the one Visual Studio produces.
 
 **Z order.** `Controls.Add` appends to the back, index `0` is the front most control. The
 generator emits the `Controls.Add` calls in that same order, so the stacking survives the
@@ -128,14 +130,15 @@ the `components` field of the generated file.
 
 ## Verification
 
-Run the focused Windows smoke harness to check `.designer.cs` parsing, loading into the live
-form, control movement and resizing, cursor restoration, and undo:
+Run the focused Windows smoke harness to check `.designer.cs` parsing, rendering without
+hosted child controls, container-relative insertion, nested-control movement and resizing,
+root-form movement and resizing, cursor restoration, repainting, and undo:
 
 ```powershell
 dotnet run --project tests/ParserSmoke/ParserSmoke.csproj
 ```
 
-The solution build command above checks compilation. The smoke harness checks that the old
-control area is repainted after a move, but interactive dragging and resizing should still be
-verified on Windows. The generated project's Visual Studio Designer round trip also requires
-interactive verification.
+The solution build command above checks compilation. The smoke harness dispatches mouse
+messages to the canvas; interactive dragging and resizing should still be verified on a
+desktop. The generated project's Visual Studio Designer round trip also requires interactive
+verification.

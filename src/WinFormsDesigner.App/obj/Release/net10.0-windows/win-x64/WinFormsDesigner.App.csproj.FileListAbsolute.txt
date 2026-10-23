@@ -230,3 +230,4 @@ D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\obj\Release\net10
 D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\obj\Release\net10.0-windows\win-x64\WinFormsDesigner.pdb
 D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\obj\Release\net10.0-windows\win-x64\WinFormsDesigner.App.genruntimeconfig.cache
 D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\obj\Release\net10.0-windows\win-x64\ref\WinFormsDesigner.dll
+D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\obj\Release\net10.0-windows\win-x64\WinFormsDesigner.App.sourcelink.json

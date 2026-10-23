@@ -1,0 +1,3 @@
+D:\Ken\Ken\MyPrograms\winformdesginer\publish\win-x64\WinFormsDesigner.pdb
+D:\Ken\Ken\MyPrograms\winformdesginer\publish\win-x64\WinFormsDesigner.Core.pdb
+D:\Ken\Ken\MyPrograms\winformdesginer\publish\win-x64\WinFormsDesigner.exe

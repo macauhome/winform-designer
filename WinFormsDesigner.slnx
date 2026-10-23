@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/WinFormsDesigner.App/WinFormsDesigner.App.csproj" />
+    <Project Path="src/WinFormsDesigner.Core/WinFormsDesigner.Core.csproj" />
+  </Folder>
+</Solution>

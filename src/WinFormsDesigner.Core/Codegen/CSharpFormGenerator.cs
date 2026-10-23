@@ -221,7 +221,7 @@ public sealed class CSharpFormGenerator
 
         // Suspend layout for every container that hosts children. The root form is suspended
         // separately because it is addressed through "this" rather than a field.
-        var layoutContainers = nodes.Where(n => n.Parent is not null && n.Children.Count > 0).ToList();
+        var layoutContainers = nodes.Where(n => n.Parent is not null && n.Children.Count > 0 && typeof(System.Windows.Forms.Control).IsAssignableFrom(n.ControlType)).ToList();
         sb.AppendLine("            this.SuspendLayout();");
         foreach (var container in layoutContainers)
         {
@@ -290,7 +290,10 @@ public sealed class CSharpFormGenerator
         var stripItems = node.Children.Where(c => IsToolStripItem(c.ControlType)).ToList();
         if (stripItems.Count > 0)
         {
-            lines.Add(("Controls", $"            this.{field}.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {{"));
+            var collectionName = typeof(System.Windows.Forms.ToolStripDropDownItem).IsAssignableFrom(node.ControlType)
+                ? "DropDownItems"
+                : "Items";
+            lines.Add(("Controls", $"            this.{field}.{collectionName}.AddRange(new System.Windows.Forms.ToolStripItem[] {{"));
             foreach (var child in stripItems)
             {
                 lines.Add(("Controls", $"                this.{fieldNames[child]},"));
@@ -470,7 +473,7 @@ public sealed class CSharpFormGenerator
         foreach (var property in root.Properties.Values.Keys)
         {
             if (AlwaysWrittenProperties.Contains(property, StringComparer.Ordinal)
-                || property is "Items" or "Columns" or "AutoScaleDimensions"
+                || property is "Items" or "Columns" or "AutoScaleDimensions" or "AutoScaleMode"
                 || property is "ClientSize" or "Text")
             {
                 // These are written explicitly further down.

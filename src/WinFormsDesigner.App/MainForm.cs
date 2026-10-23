@@ -1,10 +1,12 @@
 using System.Drawing;
+using System.Text;
 using System.Windows.Forms;
 using WinFormsDesigner.App.Designer;
 using WinFormsDesigner.App.Layout;
 using WinFormsDesigner.App.Properties;
 using WinFormsDesigner.App.Toolbox;
 using WinFormsDesigner.Core.Codegen;
+using WinFormsDesigner.Core.Model;
 
 namespace WinFormsDesigner.App;
 
@@ -36,6 +38,8 @@ public sealed class MainForm : Form
     private readonly ToolStripMenuItem _showGuides = new();
 
     private DesignSession _session = new();
+    private string? _currentFilePath;
+    private string _savedSignature = string.Empty;
 
     public MainForm()
     {
@@ -50,13 +54,15 @@ public sealed class MainForm : Form
         BuildToolbar();
         BuildStatusBar();
 
+        AttachSession(_session);
+
         _surface.Session = _session;
         _properties.Session = _session;
 
         _toolbox.ControlRequested += OnControlRequested;
         _surface.PointerMoved += OnPointerMoved;
-        _session.SelectionChanged += (_, _) => UpdateStatus();
-        _session.Changed += (_, _) => UpdateTitle();
+
+        _savedSignature = ComputeDocumentSignature(_session.Document);
 
         UpdateTitle();
         UpdateStatus();
@@ -244,13 +250,22 @@ public sealed class MainForm : Form
 
     private void NewDocument()
     {
+        if (!ConfirmDiscardChanges())
+        {
+            return;
+        }
+
         var previous = _session;
 
-        _session = new DesignSession();
+        var session = new DesignSession();
+        AttachSession(session);
         _surface.Session = _session;
         _properties.Session = _session;
 
         previous.RootForm.Dispose();
+
+        _currentFilePath = null;
+        _savedSignature = ComputeDocumentSignature(_session.Document);
 
         FocusSurface();
         UpdateTitle();
@@ -259,6 +274,11 @@ public sealed class MainForm : Form
 
     private void OpenFile()
     {
+        if (!ConfirmDiscardChanges())
+        {
+            return;
+        }
+
         try
         {
             using var dialog = new OpenFileDialog
@@ -285,12 +305,16 @@ public sealed class MainForm : Form
             }
 
             var previous = _session;
-            _session = new DesignSession();
+            var session = new DesignSession();
+            AttachSession(session);
             _surface.Session = _session;
             _properties.Session = _session;
 
             _session.LoadDocument(document);
             previous.RootForm.Dispose();
+
+            _currentFilePath = dialog.FileName;
+            _savedSignature = ComputeDocumentSignature(_session.Document);
 
             FocusSurface();
             UpdateTitle();
@@ -396,6 +420,7 @@ public sealed class MainForm : Form
         using var dialog = new GenerateCodeDialog(_session.Document);
         if (dialog.ShowDialog(this) == DialogResult.OK)
         {
+            _savedSignature = ComputeDocumentSignature(_session.Document);
             FocusSurface();
         }
     }
@@ -415,6 +440,96 @@ public sealed class MainForm : Form
     // ---------------------------------------------------------------------
     // Housekeeping
     // ---------------------------------------------------------------------
+
+    private void AttachSession(DesignSession session)
+    {
+        if (_session is not null && !ReferenceEquals(_session, session))
+        {
+            _session.SelectionChanged -= Session_SelectionChanged;
+            _session.Changed -= Session_Changed;
+        }
+
+        _session = session;
+        _session.SelectionChanged += Session_SelectionChanged;
+        _session.Changed += Session_Changed;
+    }
+
+    private void Session_SelectionChanged(object? sender, EventArgs e) => UpdateStatus();
+
+    private void Session_Changed(object? sender, EventArgs e) => UpdateTitle();
+
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        if (!ConfirmDiscardChanges())
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        base.OnFormClosing(e);
+    }
+
+    private bool IsDirty()
+    {
+        return !string.Equals(ComputeDocumentSignature(_session.Document), _savedSignature, StringComparison.Ordinal);
+    }
+
+    private bool ConfirmDiscardChanges()
+    {
+        if (!IsDirty())
+        {
+            return true;
+        }
+
+        var result = MessageBox.Show(
+            this,
+            "The current form has unsaved changes. Do you want to save them before continuing?",
+            "Unsaved changes",
+            MessageBoxButtons.YesNoCancel,
+            MessageBoxIcon.Question);
+
+        if (result == DialogResult.Cancel)
+        {
+            return false;
+        }
+
+        if (result == DialogResult.Yes)
+        {
+            using var dialog = new GenerateCodeDialog(_session.Document);
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+            {
+                return false;
+            }
+
+            _savedSignature = ComputeDocumentSignature(_session.Document);
+        }
+
+        return true;
+    }
+
+    private static string ComputeDocumentSignature(DesignDocument document)
+    {
+        try
+        {
+            var generated = new CSharpFormGenerator().Generate(document);
+            var builder = new StringBuilder();
+            foreach (var pair in generated.Files.OrderBy(p => p.Key, StringComparer.Ordinal))
+            {
+                builder.Append(pair.Key);
+                builder.Append('\u0001');
+                builder.Append(pair.Value);
+                builder.Append('\u0002');
+            }
+
+            var bytes = System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(builder.ToString()));
+            return Convert.ToHexString(bytes);
+        }
+        catch
+        {
+            return Guid.NewGuid().ToString("N");
+        }
+    }
 
     private void FocusSurface() => _surface.Focus();
 

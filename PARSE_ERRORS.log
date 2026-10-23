@@ -1,0 +1,26 @@
+WinForms Designer parser errors/warnings log
+Generated during analysis of the supplied Form1 designer code.
+
+Errors that prevented parsing:
+1. Instantiations used bare field names without "this." (e.g. "menuStrip1 = new MenuStrip();"). Parser's NewControlRegex required "this.".
+2. Property assignments used bare field names (e.g. "menuStrip1.Location = ..."). PropertyAssignRegex required "this.".
+3. Root-level assignments omitted "this." (e.g. "AutoScaleMode = ...", "Controls.Add(menuStrip1)", "MainMenuStrip = menuStrip1"). RootPropertyAssignRegex required "this.".
+4. Event handlers used bare fields (e.g. "openDaysToolStripMenuItem.Click += ..."). EventAssignRegex required "this.".
+5. Controls were added without "this." ("Controls.Add(menuStrip1)"). ControlsAddRegex required "this.".
+6. ToolStrip items were added via Items.AddRange/DropDownItems.AddRange; parser only handled Controls.Add/Controls.AddRange.
+7. ToolStripMenuItem nested items were not created in the live tree (CreateStripItem did not recurse).
+8. Generator emitted ".Items.AddRange" for ToolStripMenuItem parents (should be DropDownItems) and suspended layout on ToolStripItems.
+9. Short type names ("new Size", "new Point") were not recognized by TryParseSize/TryParsePoint.
+10. AutoScaleMode was emitted twice in generated code.
+
+Fixes applied:
+- Made "this." optional in all relevant regexes with negative lookbehinds.
+- Added Items/DropDownItems Add/AddRange parsing and hierarchy building.
+- Updated CreateStripItem to handle parent ToolStrip/ToolStripMenuItem and recurse.
+- Updated generator to use DropDownItems for ToolStripDropDownItem parents.
+- Excluded non-Control nodes from layout suspend/resume.
+- Supported short "Size"/"Point"/"SizeF" names.
+- Prevented duplicate AutoScaleMode emission.
+- Improved reference property handling for bare field names.
+
+Result: Sample parses into Form1 -> menuStrip1 -> toolsToolStripMenuItem -> openDaysToolStripMenuItem; generated project builds successfully.

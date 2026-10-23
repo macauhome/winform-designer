@@ -13,24 +13,26 @@ public static class DesignerFileLoader
 {
     private static readonly Regex NamespaceRegex = new(@"^\s*namespace\s+([^\s{;]+)", RegexOptions.Compiled | RegexOptions.Multiline);
     private static readonly Regex ClassRegex = new(@"partial\s+class\s+([A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
-    private static readonly Regex NewControlRegex = new(@"this\.([A-Za-z_][A-Za-z0-9_]*)\s*=\s*new\s+([\w\.\[\],\s<>]+)\s*\(\s*\)\s*;", RegexOptions.Compiled);
-    private static readonly Regex PropertyAssignRegex = new(@"this\.([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*;", RegexOptions.Compiled);
-    private static readonly Regex ControlsAddRegex = new(@"this(?:\.([A-Za-z_][A-Za-z0-9_]*))?\.Controls\.Add\s*\(\s*this\.([A-Za-z_][A-Za-z0-9_]*)(?:\s*,[^)]*)?\)\s*;", RegexOptions.Compiled);
-    private static readonly Regex ControlsAddRangeRegex = new(@"this(?:\.([A-Za-z_][A-Za-z0-9_]*))?\.Controls\.AddRange\s*\(\s*new\s+[\w\.\[\],\s]+\{([\s\S]*?)\}\s*\)\s*;", RegexOptions.Compiled);
-    private static readonly Regex ChildReferenceRegex = new(@"this\.([A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
-    private static readonly Regex EventAssignRegex = new(@"this\.([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)\s*\+=\s*(?:new\s+[\w\.\[\],\s<>]+\s*\(\s*)?this\.([A-Za-z_][A-Za-z0-9_]*)(?:\s*\))?\s*;", RegexOptions.Compiled);
-    private static readonly Regex RootPropertyAssignRegex = new(@"this\.([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*;", RegexOptions.Compiled);
-    private static readonly Regex PointRegex = new(@"new\s+System\.Drawing\.Point\s*\(\s*([-]?\d+)\s*,\s*([-]?\d+)\s*\)", RegexOptions.Compiled);
-    private static readonly Regex SizeRegex = new(@"new\s+System\.Drawing\.Size\s*\(\s*([-]?\d+)\s*,\s*([-]?\d+)\s*\)", RegexOptions.Compiled);
+    private static readonly Regex NewControlRegex = new(@"(?<![.\w])(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*new\s+([\w\.\[\],\s<>]+)\s*\(\s*\)\s*;", RegexOptions.Compiled);
+    private static readonly Regex PropertyAssignRegex = new(@"(?<![.\w])(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*;", RegexOptions.Compiled);
+    private static readonly Regex ControlsAddRegex = new(@"(?<![.\w])(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)?\s*\.?\s*Controls\.Add\s*\(\s*(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)(?:\s*,[^)]*)?\)\s*;", RegexOptions.Compiled);
+    private static readonly Regex ControlsAddRangeRegex = new(@"(?<![.\w])(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)?\s*\.?\s*Controls\.AddRange\s*\(\s*new\s+[\w\.\[\],\s]+?\{([\s\S]*?)\}\s*\)\s*;", RegexOptions.Compiled);
+    private static readonly Regex ToolStripItemsAddRegex = new(@"(?<![.\w])(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)?\s*\.?\s*(?:Items|DropDownItems)\.Add\s*\(\s*(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)(?:\s*,[^)]*)?\)\s*;", RegexOptions.Compiled);
+    private static readonly Regex ToolStripItemsAddRangeRegex = new(@"(?<![.\w])(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)?\s*\.?\s*(?:Items|DropDownItems)\.AddRange\s*\(\s*new\s+[\w\.\[\],\s]+?\{([\s\S]*?)\}\s*\)\s*;", RegexOptions.Compiled);
+    private static readonly Regex ChildReferenceRegex = new(@"(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
+    private static readonly Regex EventAssignRegex = new(@"(?<![.\w])(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)\s*\+=\s*(?:new\s+[\w\.\[\],\s<>]+\s*\(\s*)?(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)(?:\s*\))?\s*;", RegexOptions.Compiled);
+    private static readonly Regex RootPropertyAssignRegex = new(@"(?<![.\w])(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*;", RegexOptions.Compiled);
+    private static readonly Regex PointRegex = new(@"new\s+(?:System\.Drawing\.)?Point\s*\(\s*([-]?\d+)\s*,\s*([-]?\d+)\s*\)", RegexOptions.Compiled);
+    private static readonly Regex SizeRegex = new(@"new\s+(?:System\.Drawing\.)?Size\s*\(\s*([-]?\d+)\s*,\s*([-]?\d+)\s*\)", RegexOptions.Compiled);
     private static readonly Regex StringRegex = new("\"((?:[^\"\\\\]|\\\\.)*)\"", RegexOptions.Compiled);
     private static readonly Regex NumberRegex = new(@"^-?\d+(\.\d+)?([FDLM])?$", RegexOptions.Compiled);
     private static readonly Regex EnumRegex = new(@"^([\w\.]+)\.([A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
 private static readonly Regex ColorSystemRegex = new(@"^System\.Drawing\.SystemColors\.([A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
-    private static readonly Regex ColorSystemRegex = new(@\"^System\.Drawing\.SystemColors\.([A-Za-z_][A-Za-z0-9_]*)$\", RegexOptions.Compiled);
+    private static readonly Regex ColorKnownRegex = new(@"^System\.Drawing\.Color\.([A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
     private static readonly Regex ColorArgbRegex = new(@"^System\.Drawing\.Color\.FromArgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$", RegexOptions.Compiled);
     private static readonly Regex ColorArgb3Regex = new(@"^System\.Drawing\.Color\.FromArgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$", RegexOptions.Compiled);
     private static readonly Regex FieldDeclRegex = new(@"(?:private|protected|internal|public)\s+([\w\.\[\],\s<>]+)\s+([A-Za-z_][A-Za-z0-9_]*)\s*;", RegexOptions.Compiled);
-    private static readonly Regex SizeFRegex = new(@"new\s+System\.Drawing\.SizeF\s*\(\s*(-?\d+(?:\.\d+)?)(?:F)?\s*,\s*(-?\d+(?:\.\d+)?)(?:F)?\s*\)", RegexOptions.Compiled);
+    private static readonly Regex SizeFRegex = new(@"new\s+(?:System\.Drawing\.)?SizeF\s*\(\s*(-?\d+(?:\.\d+)?)(?:F)?\s*,\s*(-?\d+(?:\.\d+)?)(?:F)?\s*\)", RegexOptions.Compiled);
     private static readonly Regex FontRegex = new(@"new\s+(?:System\.Drawing\.)?Font\s*\(\s*""((?:[^""\\]|\\.)*)""\s*,\s*(\d+(?:\.\d+)?)(?:F)?\s*,\s*(?:System\.Drawing\.)?FontStyle\.([A-Za-z]+)(?:\s*,\s*(?:System\.Drawing\.)?GraphicsUnit\.([A-Za-z]+))?", RegexOptions.Compiled);
 
     /// <summary>Parses a .designer.cs file into a <see cref="DesignDocument"/>.</summary>
@@ -128,8 +130,8 @@ private static readonly Regex ColorSystemRegex = new(@"^System\.Drawing\.SystemC
             {
                 continue;
             }
-            // Skip Controls.Add calls
-            if (property == "Controls" && value.Contains("Add"))
+            // Skip Controls.Add / Items.Add calls
+            if ((property == "Controls" || property == "Items" || property == "DropDownItems") && value.Contains("Add"))
             {
                 continue;
             }
@@ -173,6 +175,11 @@ private static readonly Regex ColorSystemRegex = new(@"^System\.Drawing\.SystemC
                 continue;
             }
 
+            if ((property == "Controls" || property == "Items" || property == "DropDownItems") && value.Contains("Add"))
+            {
+                continue;
+            }
+
             ApplyNodeProperty(node, property, value);
         }
 
@@ -192,6 +199,20 @@ private static readonly Regex ColorSystemRegex = new(@"^System\.Drawing\.SystemC
         }
 
         foreach (Match m in ControlsAddRangeRegex.Matches(source))
+        {
+            foreach (Match child in ChildReferenceRegex.Matches(m.Groups[2].Value))
+            {
+                AddChild(m.Groups[1].Value, child.Groups[1].Value);
+            }
+        }
+
+        // Build hierarchy from ToolStrip Items.Add / DropDownItems.Add calls.
+        foreach (Match m in ToolStripItemsAddRegex.Matches(source))
+        {
+            AddChild(m.Groups[1].Value, m.Groups[2].Value);
+        }
+
+        foreach (Match m in ToolStripItemsAddRangeRegex.Matches(source))
         {
             foreach (Match child in ChildReferenceRegex.Matches(m.Groups[2].Value))
             {
@@ -465,7 +486,7 @@ private static readonly Regex ColorSystemRegex = new(@"^System\.Drawing\.SystemC
         }
 
         // Reference to another control: this.otherField.
-        var refMatch = Regex.Match(trimmed, @"^this\.([A-Za-z_][A-Za-z0-9_]*)$");
+        var refMatch = Regex.Match(trimmed, @"^(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)$");
         if (refMatch.Success && propertyType is not null && typeof(Control).IsAssignableFrom(propertyType))
         {
             var refField = refMatch.Groups[1].Value;

@@ -954,7 +954,7 @@ public sealed class DesignSession
     }
 
     /// <summary>Creates the live instance of a tool strip item.</summary>
-    private void CreateStripItem(Control parent, DesignNode node)
+    private void CreateStripItem(object parent, DesignNode node)
     {
         object instance;
         try
@@ -969,9 +969,29 @@ public sealed class DesignSession
         _components[node] = instance;
         ControlFactory.Apply(instance, node.Properties);
 
-        if (instance is ToolStripItem item && parent is ToolStrip strip)
+        if (instance is ToolStripItem item)
         {
-            strip.Items.Add(item);
+            if (parent is ToolStrip strip)
+            {
+                strip.Items.Add(item);
+            }
+            else if (parent is ToolStripMenuItem menuItem)
+            {
+                menuItem.DropDownItems.Add(item);
+            }
+
+            // Recurse into nested items (sub-menus, drop-downs).
+            foreach (var child in node.Children)
+            {
+                if (IsToolStripItem(child.ControlType))
+                {
+                    CreateStripItem(item, child);
+                }
+                else if (ControlFactory.IsComponent(child.ControlType))
+                {
+                    CreateComponent(child);
+                }
+            }
         }
     }
 

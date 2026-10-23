@@ -17,6 +17,11 @@ public static class ColorText
             return "(System)";
         }
 
+        if (color.IsSystemColor)
+        {
+            return color.Name;
+        }
+
         if (color.IsKnownColor)
         {
             return color.Name;

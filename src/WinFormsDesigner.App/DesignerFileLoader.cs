@@ -25,7 +25,8 @@ public static class DesignerFileLoader
     private static readonly Regex StringRegex = new("\"((?:[^\"\\\\]|\\\\.)*)\"", RegexOptions.Compiled);
     private static readonly Regex NumberRegex = new(@"^-?\d+(\.\d+)?([FDLM])?$", RegexOptions.Compiled);
     private static readonly Regex EnumRegex = new(@"^([\w\.]+)\.([A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
-    private static readonly Regex ColorKnownRegex = new(@"^System\.Drawing\.Color\.([A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
+private static readonly Regex ColorSystemRegex = new(@"^System\.Drawing\.SystemColors\.([A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
+    private static readonly Regex ColorSystemRegex = new(@\"^System\.Drawing\.SystemColors\.([A-Za-z_][A-Za-z0-9_]*)$\", RegexOptions.Compiled);
     private static readonly Regex ColorArgbRegex = new(@"^System\.Drawing\.Color\.FromArgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$", RegexOptions.Compiled);
     private static readonly Regex ColorArgb3Regex = new(@"^System\.Drawing\.Color\.FromArgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$", RegexOptions.Compiled);
     private static readonly Regex FieldDeclRegex = new(@"(?:private|protected|internal|public)\s+([\w\.\[\],\s<>]+)\s+([A-Za-z_][A-Za-z0-9_]*)\s*;", RegexOptions.Compiled);
@@ -587,7 +588,20 @@ public static class DesignerFileLoader
     {
         result = System.Drawing.Color.Empty;
 
-        var m = ColorKnownRegex.Match(value);
+        var m = ColorSystemRegex.Match(value);
+        if (m.Success)
+        {
+            var property = typeof(System.Drawing.SystemColors).GetProperty(m.Groups[1].Value);
+            if (property is not null)
+            {
+                result = (System.Drawing.Color)property.GetValue(null)!;
+                return true;
+            }
+
+            return false;
+        }
+
+        m = ColorKnownRegex.Match(value);
         if (m.Success)
         {
             try

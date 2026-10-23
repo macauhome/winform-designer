@@ -128,14 +128,14 @@ public static class CSharpValueFormatter
             return "System.Drawing.Color.Empty";
         }
 
-        if (color.A == 255 && color.IsKnownColor)
-        {
-            return $"System.Drawing.Color.{color.Name}";
-        }
-
         if (color.A == 255 && color.IsSystemColor)
         {
             return $"System.Drawing.SystemColors.{color.Name}";
+        }
+
+        if (color.A == 255 && color.IsKnownColor)
+        {
+            return $"System.Drawing.Color.{color.Name}";
         }
 
         return $"System.Drawing.Color.FromArgb({color.A.ToString(CultureInfo.InvariantCulture)}, {color.R.ToString(CultureInfo.InvariantCulture)}, {color.G.ToString(CultureInfo.InvariantCulture)}, {color.B.ToString(CultureInfo.InvariantCulture)})";

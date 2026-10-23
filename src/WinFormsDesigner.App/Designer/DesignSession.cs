@@ -32,6 +32,7 @@ public sealed class DesignSession
         RootForm.Size = new Size(800, 450);
         Document.Root.Properties.SetValue("ClientSize", new Size(800, 450));
         Document.Root.Properties.SetValue("Text", Document.ClassName);
+        Document.Root.Properties.SetValue("BackColor", SystemColors.Control);
         Document.Root.SetEvent("Load", Document.ClassName + "_Load");
 
         RebuildLiveTree();
@@ -178,7 +179,15 @@ public sealed class DesignSession
             {
                 node.Properties.SetValue("Location", locationInParent);
             }
+
+            // Newly added controls display their name as their caption so that they are
+            // identifiable on the design surface (and stay in sync after auto-renaming).
+            if (controlType.GetProperty("Text") is { CanWrite: true })
+            {
+                node.Properties.SetValue("Text", node.Name);
+            }
         }
+
 
         if (typeof(ToolStrip).IsAssignableFrom(controlType) || typeof(StatusStrip).IsAssignableFrom(controlType))
         {
@@ -539,6 +548,11 @@ public sealed class DesignSession
         {
             var copy = CloneSubtree(clipboardNode);
             copy.Name = MakeUniqueDefaultName(GetNameBase(copy.Name));
+            if (copy.Properties.TryGetValue("Text", out var textValue) && textValue is string textValueString
+                && string.Equals(textValueString, clipboardNode.Name, StringComparison.Ordinal))
+            {
+                copy.Properties.SetValue("Text", copy.Name);
+            }
             copy.Parent = parent;
             parent.Children.Insert(0, copy);
             copy.Properties.SetValue("Location", new Point(

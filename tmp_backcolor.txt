@@ -1,0 +1,16 @@
+D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\Designer\DesignerSurface.cs:35:BackColor = SystemColors.Control;
+D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\Designer\DesignerSurface.cs:709:BackColor = Color.FromArgb(0xF0, 0xF0, 0xF0);
+D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\Designer\DesignSession.cs:35:Document.Root.Properties.SetValue("BackColor", Color.White);
+D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\Layout\DesignerShellLayout.cs:57:BackColor = BackgroundColor;
+D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\Properties\PropertyGridView.cs:61:BackColor = SystemColors.Control;
+D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\Properties\PropertyGridView.cs:71:_editorHost.BackColor = SystemColors.Control;
+D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\Properties\PropertyGridView.cs:422:cacheGraphics.Clear(BackColor);
+D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\Toolbox\ToolboxPanel.cs:41:_list.BackColor = SystemColors.Control;
+D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\DesignerFileLoader.cs:324:case "BackColor":
+D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\GenerateCodeDialog.cs:87:_preview.BackColor = SystemColors.Window;
+D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\MainForm.cs:105:BackColor = Color.FromArgb(0xF0, 0xF0, 0xF0),
+D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.Core\Reflection\PropertyMetadataTable.cs:78:["BackColor"] = new("Appearance", "BackColor", PropertyEditorKind.Color, Order: 20),
+D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.Core\Reflection\PropertyMetadataTable.cs:88:["UseVisualStyleBackColor"] = new("Appearance", "UseVisualStyleBackColor", PropertyEditorKind.Boolean, Order: 30),
+D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.Core\Reflection\PropertyMetadataTable.cs:122:["SelectionBackColor"] = new("Appearance", "SelectionBackColor", PropertyEditorKind.Color, Order: 64),
+D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.Core\Reflection\PropertyMetadataTable.cs:123:["OddRowBackColor"] = new("Appearance", "OddRowBackColor", PropertyEditorKind.Color, Order: 65),
+D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.Core\Reflection\PropertyMetadataTable.cs:124:["EvenRowBackColor"] = new("Appearance", "EvenRowBackColor", PropertyEditorKind.Color, Order: 66),

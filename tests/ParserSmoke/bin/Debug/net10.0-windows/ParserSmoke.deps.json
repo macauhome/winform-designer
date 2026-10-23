@@ -1,0 +1,68 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "ParserSmoke/1.0.0": {
+        "dependencies": {
+          "WinFormsDesigner": "1.0.0",
+          "WinFormsDesigner.Reference": "1.0.0.0"
+        },
+        "runtime": {
+          "ParserSmoke.dll": {}
+        }
+      },
+      "WinFormsDesigner/1.0.0": {
+        "dependencies": {
+          "WinFormsDesigner.Core": "1.0.0"
+        },
+        "runtime": {
+          "WinFormsDesigner.dll": {
+            "fileVersion": "0.0.0.0"
+          }
+        }
+      },
+      "WinFormsDesigner.Core/1.0.0": {
+        "runtime": {
+          "WinFormsDesigner.Core.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "WinFormsDesigner.Reference/1.0.0.0": {
+        "runtime": {
+          "WinFormsDesigner.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "ParserSmoke/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "WinFormsDesigner/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "WinFormsDesigner.Core/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "WinFormsDesigner.Reference/1.0.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

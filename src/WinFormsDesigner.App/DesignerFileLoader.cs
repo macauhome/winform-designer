@@ -15,8 +15,10 @@ public static class DesignerFileLoader
     private static readonly Regex ClassRegex = new(@"partial\s+class\s+([A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
     private static readonly Regex NewControlRegex = new(@"this\.([A-Za-z_][A-Za-z0-9_]*)\s*=\s*new\s+([\w\.\[\],\s<>]+)\s*\(\s*\)\s*;", RegexOptions.Compiled);
     private static readonly Regex PropertyAssignRegex = new(@"this\.([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*;", RegexOptions.Compiled);
-    private static readonly Regex ControlsAddRegex = new(@"this(?:\.([A-Za-z_][A-Za-z0-9_]*))?\.Controls\.Add\(this\.([A-Za-z_][A-Za-z0-9_]*)\)\s*;", RegexOptions.Compiled);
-    private static readonly Regex EventAssignRegex = new(@"this\.([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)\s*\+=\s*new\s+[\w\.\[\],\s<>]+\(this\.([A-Za-z_][A-Za-z0-9_]*)\)\s*;", RegexOptions.Compiled);
+    private static readonly Regex ControlsAddRegex = new(@"this(?:\.([A-Za-z_][A-Za-z0-9_]*))?\.Controls\.Add\s*\(\s*this\.([A-Za-z_][A-Za-z0-9_]*)(?:\s*,[^)]*)?\)\s*;", RegexOptions.Compiled);
+    private static readonly Regex ControlsAddRangeRegex = new(@"this(?:\.([A-Za-z_][A-Za-z0-9_]*))?\.Controls\.AddRange\s*\(\s*new\s+[\w\.\[\],\s]+\{([\s\S]*?)\}\s*\)\s*;", RegexOptions.Compiled);
+    private static readonly Regex ChildReferenceRegex = new(@"this\.([A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
+    private static readonly Regex EventAssignRegex = new(@"this\.([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)\s*\+=\s*(?:new\s+[\w\.\[\],\s<>]+\s*\(\s*)?this\.([A-Za-z_][A-Za-z0-9_]*)(?:\s*\))?\s*;", RegexOptions.Compiled);
     private static readonly Regex RootPropertyAssignRegex = new(@"this\.([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*;", RegexOptions.Compiled);
     private static readonly Regex PointRegex = new(@"new\s+System\.Drawing\.Point\s*\(\s*([-]?\d+)\s*,\s*([-]?\d+)\s*\)", RegexOptions.Compiled);
     private static readonly Regex SizeRegex = new(@"new\s+System\.Drawing\.Size\s*\(\s*([-]?\d+)\s*,\s*([-]?\d+)\s*\)", RegexOptions.Compiled);
@@ -26,7 +28,9 @@ public static class DesignerFileLoader
     private static readonly Regex ColorKnownRegex = new(@"^System\.Drawing\.Color\.([A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
     private static readonly Regex ColorArgbRegex = new(@"^System\.Drawing\.Color\.FromArgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$", RegexOptions.Compiled);
     private static readonly Regex ColorArgb3Regex = new(@"^System\.Drawing\.Color\.FromArgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$", RegexOptions.Compiled);
-    private static readonly Regex FieldDeclRegex = new(@"private\s+([\w\.\[\],\s<>]+)\s+([A-Za-z_][A-Za-z0-9_]*)\s*;", RegexOptions.Compiled);
+    private static readonly Regex FieldDeclRegex = new(@"(?:private|protected|internal|public)\s+([\w\.\[\],\s<>]+)\s+([A-Za-z_][A-Za-z0-9_]*)\s*;", RegexOptions.Compiled);
+    private static readonly Regex SizeFRegex = new(@"new\s+System\.Drawing\.SizeF\s*\(\s*(-?\d+(?:\.\d+)?)(?:F)?\s*,\s*(-?\d+(?:\.\d+)?)(?:F)?\s*\)", RegexOptions.Compiled);
+    private static readonly Regex FontRegex = new(@"new\s+(?:System\.Drawing\.)?Font\s*\(\s*""((?:[^""\\]|\\.)*)""\s*,\s*(\d+(?:\.\d+)?)(?:F)?\s*,\s*(?:System\.Drawing\.)?FontStyle\.([A-Za-z]+)(?:\s*,\s*(?:System\.Drawing\.)?GraphicsUnit\.([A-Za-z]+))?", RegexOptions.Compiled);
 
     /// <summary>Parses a .designer.cs file into a <see cref="DesignDocument"/>.</summary>
     public static DesignDocument? Load(string filePath)
@@ -36,7 +40,13 @@ public static class DesignerFileLoader
             return null;
         }
 
-        var source = File.ReadAllText(filePath);
+        var designerPath = FindDesignerFile(filePath);
+        if (designerPath is null)
+        {
+            return null;
+        }
+
+        var source = File.ReadAllText(designerPath);
         var document = new DesignDocument();
 
         // Namespace.
@@ -57,7 +67,7 @@ public static class DesignerFileLoader
         document.ClassName = className;
         document.Root.Name = className;
 
-        // Collect field declarations: private Type fieldName;
+        // Collect declared fields and resolve their control/component types.
         var fieldTypes = new Dictionary<string, Type>(StringComparer.Ordinal);
         foreach (Match m in FieldDeclRegex.Matches(source))
         {
@@ -107,7 +117,8 @@ public static class DesignerFileLoader
             if (value.TrimStart().StartsWith("new ") 
                 && !value.Contains("System.Drawing.Size")
                 && !value.Contains("System.Drawing.Point")
-                && !value.Contains("System.Drawing.Color"))
+                && !value.Contains("System.Drawing.Color")
+                && !value.Contains("System.Drawing.Font"))
             {
                 continue;
             }
@@ -176,9 +187,19 @@ public static class DesignerFileLoader
         // Build hierarchy from Controls.Add calls.
         foreach (Match m in ControlsAddRegex.Matches(source))
         {
-            var parentField = m.Groups[1].Value; // Empty for "this.Controls.Add(...)"
-            var childField = m.Groups[2].Value;
+            AddChild(m.Groups[1].Value, m.Groups[2].Value);
+        }
 
+        foreach (Match m in ControlsAddRangeRegex.Matches(source))
+        {
+            foreach (Match child in ChildReferenceRegex.Matches(m.Groups[2].Value))
+            {
+                AddChild(m.Groups[1].Value, child.Groups[1].Value);
+            }
+        }
+
+        void AddChild(string parentField, string childField)
+        {
             DesignNode parent;
             if (string.IsNullOrEmpty(parentField) || parentField == document.ClassName)
             {
@@ -190,12 +211,12 @@ public static class DesignerFileLoader
             }
             else
             {
-                continue;
+                return;
             }
 
             if (!fieldToNode.TryGetValue(childField, out var child))
             {
-                continue;
+                return;
             }
 
             if (child.Parent is not null)
@@ -240,6 +261,25 @@ public static class DesignerFileLoader
         }
 
         return document;
+    }
+
+    private static string? FindDesignerFile(string filePath)
+    {
+        var fileName = Path.GetFileName(filePath);
+        if (fileName.EndsWith(".designer.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return filePath;
+        }
+
+        var baseName = Path.GetFileNameWithoutExtension(filePath);
+        var directory = Path.GetDirectoryName(filePath) ?? string.Empty;
+        var candidates = new[]
+        {
+            Path.Combine(directory, baseName + ".Designer.cs"),
+            Path.Combine(directory, baseName + ".designer.cs"),
+        };
+
+        return candidates.FirstOrDefault(File.Exists);
     }
 
     private static void ApplyRootProperty(DesignDocument document, DesignNode root, string property, string value)
@@ -340,11 +380,16 @@ public static class DesignerFileLoader
     private static void ApplyGenericProperty(DesignNode node, string property, string value)
     {
         var trimmed = value.Trim();
+        var propertyType = ResolvePropertyType(node.ControlType, property);
 
         // String literal.
         if (TryParseString(trimmed, out var text))
         {
-            node.Properties.SetValue(property, text);
+            if (propertyType == typeof(string))
+            {
+                node.Properties.SetValue(property, text);
+            }
+
             return;
         }
 
@@ -389,11 +434,22 @@ public static class DesignerFileLoader
             return;
         }
 
-        // Enum (e.g. System.Windows.Forms.DockStyle.Fill).
-        var type = ResolvePropertyType(node.ControlType, property);
-        if (type is not null && type.IsEnum)
+        if (TryParseSizeF(trimmed, out var sizeF))
         {
-            if (TryParseEnum(trimmed, type, out var enumVal))
+            node.Properties.SetValue(property, sizeF);
+            return;
+        }
+
+        if (TryParseFont(trimmed, out var font))
+        {
+            node.Properties.SetValue(property, font);
+            return;
+        }
+
+        // Enum (e.g. System.Windows.Forms.DockStyle.Fill).
+        if (propertyType is not null && propertyType.IsEnum)
+        {
+            if (TryParseEnum(trimmed, propertyType, out var enumVal))
             {
                 node.Properties.SetValue(property, enumVal);
                 return;
@@ -409,21 +465,20 @@ public static class DesignerFileLoader
 
         // Reference to another control: this.otherField.
         var refMatch = Regex.Match(trimmed, @"^this\.([A-Za-z_][A-Za-z0-9_]*)$");
-        if (refMatch.Success)
+        if (refMatch.Success && propertyType is not null && typeof(Control).IsAssignableFrom(propertyType))
         {
             var refField = refMatch.Groups[1].Value;
             node.Properties.SetValue(property, refField);
             return;
         }
-
-        // Last resort: store as string.
-        node.Properties.SetValue(property, trimmed);
     }
 
     private static Type? ResolveType(string typeName)
     {
         var trimmed = typeName.Trim();
-        var clean = trimmed.Replace("[]", string.Empty).Trim();
+        var clean = trimmed.Replace("global::", string.Empty, StringComparison.Ordinal)
+            .Replace("[]", string.Empty, StringComparison.Ordinal)
+            .Trim();
 
         var type = Type.GetType(clean);
         if (type is not null)
@@ -434,17 +489,11 @@ public static class DesignerFileLoader
         var shortName = clean.Contains('.') ? clean.Substring(clean.LastIndexOf('.') + 1) : clean;
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
         {
-            try
+            var candidate = assembly.GetType(clean, throwOnError: false, ignoreCase: false)
+                ?? assembly.GetType("System.Windows.Forms." + shortName, throwOnError: false, ignoreCase: false);
+            if (candidate is not null)
             {
-                var candidate = assembly.GetType("System.Windows.Forms." + shortName);
-                if (candidate is not null)
-                {
-                    return candidate;
-                }
-            }
-            catch
-            {
-                // Ignore assembly load errors.
+                return candidate;
             }
         }
 
@@ -495,6 +544,21 @@ public static class DesignerFileLoader
 
         result = new System.Drawing.Size(int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture),
                                          int.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture));
+        return true;
+    }
+
+    private static bool TryParseSizeF(string value, out System.Drawing.SizeF result)
+    {
+        result = System.Drawing.SizeF.Empty;
+        var m = SizeFRegex.Match(value);
+        if (!m.Success)
+        {
+            return false;
+        }
+
+        result = new System.Drawing.SizeF(
+            float.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture),
+            float.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture));
         return true;
     }
 
@@ -578,6 +642,30 @@ public static class DesignerFileLoader
     private static bool TryParseFont(string value, out System.Drawing.Font result)
     {
         result = null!;
-        return false;
+        var m = FontRegex.Match(value);
+        if (!m.Success)
+        {
+            return false;
+        }
+
+        try
+        {
+            var family = m.Groups[1].Value.Replace("\\\"", "\"").Replace("\\\\", "\\");
+            var size = float.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture);
+            var style = Enum.Parse<System.Drawing.FontStyle>(m.Groups[3].Value, ignoreCase: true);
+            var unit = m.Groups[4].Success
+                ? Enum.Parse<System.Drawing.GraphicsUnit>(m.Groups[4].Value, ignoreCase: true)
+                : System.Drawing.GraphicsUnit.Point;
+            result = new System.Drawing.Font(family, size, style, unit);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
     }
 }

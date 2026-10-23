@@ -11,7 +11,7 @@ from scratch.
 
 | Area | Behaviour |
 | --- | --- |
-| Design surface | Drag, move and resize controls, select them, use alignment guides and snap to grid. |
+| Design surface | Open an existing `.designer.cs` file, drag, move and resize controls, select them, use alignment guides and snap to grid. |
 | Toolbox | Common WinForms controls grouped by category. Drag a control onto the surface or double click it. |
 | Property grid | Categories, inline editors for text, numbers, colours, fonts, images, collections and component references. |
 | Events | Common events of the selected control can be wired to named handler stubs. |
@@ -44,10 +44,13 @@ runtime. Copy it anywhere and run it.
 
 ## Using the designer
 
-1. Pick a control in the toolbox and drag it onto the form, or double click it to drop it
+1. Choose **File ▸ Open…** (`Ctrl+O`) and select a WinForms `.designer.cs` file to load an existing form.
+   The loader reads standard control fields, common property assignments, event handler names,
+   and `Controls.Add`/`Controls.AddRange` hierarchy entries; it does not execute the source.
+2. Pick a control in the toolbox and drag it onto the form, or double click it to drop it
    in the middle of the form.
-2. Select a control to edit its properties on the right hand side.
-3. Use **File ▸ Generate Code…** (`Ctrl+G`) to review the generated designer file and write
+3. Select a control to edit its properties on the right hand side.
+4. Use **File ▸ Generate Code…** (`Ctrl+G`) to review the generated designer file and write
    the whole project to a folder. The folder contains a runnable project:
 
    ```
@@ -94,9 +97,8 @@ src/WinFormsDesigner.App/        The designer application
 | --- | --- |
 | `MainForm.cs` | Menu, toolbar, status bar and the three pane layout. |
 | `Designer/DesignSession.cs` | Owns the document, the live control tree, the selection and the undo history. |
-| `Designer/DesignerSurface.cs` | The design surface: painting, hit testing, dragging, resizing, guides. |
+| `Designer/DesignerSurface.cs` | The design surface: painting, hit testing, pointer input, dragging, resizing and guides. |
 | `Designer/AdornmentLayer.cs` | Transparent overlay that draws the selection adornments. |
-| `Designer/DesignerMessageFilter.cs` | Routes mouse messages that arrive over designed controls. |
 | `Toolbox/ToolboxPanel.cs` | The grouped toolbox list and the drag payload. |
 | `Toolbox/GlyphFactory.cs` | Draws the toolbox icons at runtime. |
 | `Properties/PropertyGridView.cs` | The property grid. |
@@ -125,10 +127,14 @@ the `components` field of the generated file.
 
 ## Verification
 
-The project is covered by three harnesses that drive the real application:
+Run the focused Windows smoke harness to check `.designer.cs` parsing, loading into the live
+form, control movement and resizing, cursor restoration, and undo:
 
-* a session harness that exercises the document, the live tree and the undo history,
-* a painting harness that captures the surface and compares pixels,
-* a code generation harness that writes a project and builds it.
+```powershell
+dotnet run --project tests/ParserSmoke/ParserSmoke.csproj
+```
 
-All of them pass, and the generated projects build with zero warnings and zero errors.
+The solution build command above checks compilation. The smoke harness checks that the old
+control area is repainted after a move, but interactive dragging and resizing should still be
+verified on Windows. The generated project's Visual Studio Designer round trip also requires
+interactive verification.

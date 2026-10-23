@@ -306,44 +306,98 @@ public sealed class DesignSession
             return;
         }
 
-        if (live.Size == size)
-        {
-            return;
-        }
-
-        if (IsDefaultValue(node.ControlType, "Size", size))
-        {
-            node.Properties.Remove("Size");
-        }
-        else
-        {
-            node.Properties.SetValue("Size", size);
-        }
-
-        live.Size = size;
-        RaiseChanged();
+        SetBounds(node, new Rectangle(live.Location, size));
     }
 
     /// <summary>Sets the location of a control.</summary>
     public void MoveTo(DesignNode node, Point location)
     {
         var live = GetLive(node);
-        if (live is null || live.Location == location)
+        if (live is null)
         {
             return;
         }
 
-        if (IsDefaultValue(node.ControlType, "Location", location))
+        SetBounds(node, new Rectangle(location, live.Size));
+    }
+
+    /// <summary>Sets a control's bounds as one undoable edit.</summary>
+    public void SetBounds(DesignNode node, Rectangle bounds)
+    {
+        var live = GetLive(node);
+        if (live is null)
         {
-            node.Properties.Remove("Location");
+            return;
+        }
+
+        if (node.Parent is null)
+        {
+            if (live.ClientSize == bounds.Size)
+            {
+                return;
+            }
+
+            PushUndo();
+            SetStoredProperty(node, "ClientSize", bounds.Size);
+            live.ClientSize = bounds.Size;
         }
         else
         {
-            node.Properties.SetValue("Location", location);
+            if (live.Bounds == bounds)
+            {
+                return;
+            }
+
+            PushUndo();
+            SetStoredProperty(node, "Location", bounds.Location);
+            SetStoredProperty(node, "Size", bounds.Size);
+            live.Bounds = bounds;
         }
 
-        live.Location = location;
         RaiseChanged();
+    }
+
+    /// <summary>Commits bounds that were already applied to the live control during a gesture.</summary>
+    public void CommitBounds(DesignNode node, Rectangle originalBounds, Rectangle bounds)
+    {
+        var live = GetLive(node);
+        if (live is null || originalBounds == bounds)
+        {
+            return;
+        }
+
+        PushUndo();
+        if (node.Parent is null)
+        {
+            SetStoredProperty(node, "ClientSize", bounds.Size);
+            if (live.ClientSize != bounds.Size)
+            {
+                live.ClientSize = bounds.Size;
+            }
+        }
+        else
+        {
+            SetStoredProperty(node, "Location", bounds.Location);
+            SetStoredProperty(node, "Size", bounds.Size);
+            if (live.Bounds != bounds)
+            {
+                live.Bounds = bounds;
+            }
+        }
+
+        RaiseChanged();
+    }
+
+    private void SetStoredProperty(DesignNode node, string propertyName, object value)
+    {
+        if (IsDefaultValue(node.ControlType, propertyName, value))
+        {
+            node.Properties.Remove(propertyName);
+        }
+        else
+        {
+            node.Properties.SetValue(propertyName, value);
+        }
     }
 
     // ---------------------------------------------------------------------
@@ -493,6 +547,11 @@ public sealed class DesignSession
     public void LoadDocument(DesignDocument document)
     {
         Document.Reset();
+        Document.ClassName = document.ClassName;
+        Document.Namespace = document.Namespace;
+        Document.ProjectName = document.ProjectName;
+        Document.OutputDirectory = document.OutputDirectory;
+        Document.ResourceDirectory = document.ResourceDirectory;
 
         foreach (var (key, value) in document.Root.Properties.Values)
         {

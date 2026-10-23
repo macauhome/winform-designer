@@ -5,8 +5,9 @@ using System.Windows.Forms;
 namespace WinFormsDesigner.App.Designer;
 
 /// <summary>
-/// A transparent overlay that paints the selection adornments on top of the designed form.
-/// It never paints a background so the form below stays visible.
+/// A transparent, unbuffered overlay that paints selection adornments above the designed form.
+/// Double buffering is intentionally disabled because a buffered transparent child can render
+/// its untouched pixels as black instead of showing the controls underneath.
 /// </summary>
 internal sealed class AdornmentLayer : Control
 {
@@ -48,8 +49,7 @@ internal sealed class AdornmentLayer : Control
     {
         Surface?.PaintAdornments(e.Graphics);
 
-        // The scroll bars are drawn by the overlay as well, so that they stay in front of
-        // the designed form.
+        // The viewport uses native scroll bars; keep this hook for surface painting.
         Surface?.PaintScrollBars(e.Graphics);
     }
 }

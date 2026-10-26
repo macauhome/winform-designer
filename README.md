@@ -12,8 +12,8 @@ from scratch.
 
 | Area | Behaviour |
 | --- | --- |
-| Design surface | Open an existing `.designer.cs` file, drag, move and resize controls, select them, use alignment guides and snap to grid. |
-| Toolbox | Common WinForms controls grouped by category. Drag a control onto the surface or double click it. |
+| Design surface | Open an existing `.designer.cs` file, drag, move and resize controls, select them, use alignment guides, snap to grid and an optional pixel ruler. |
+| Toolbox | Common WinForms controls and non visual components (Timer, ToolTip, NotifyIcon, ErrorProvider) grouped by category. Drag an item onto the surface or double click it. |
 | Property grid | Categories, inline editors for text, numbers, colours, fonts, images, collections and component references. |
 | Events | Common events of the selected control can be wired to named handler stubs. |
 | Editing | Cut, copy, paste, delete, select all, align, bring to front, send to back. |
@@ -50,8 +50,10 @@ runtime. Copy it anywhere and run it.
    and `Controls.Add`/`Controls.AddRange` hierarchy entries; it does not execute the source.
 2. Pick a control in the toolbox and drag it onto the form, or double click it to drop it
    in the middle of the form.
-3. Select a control to edit its properties on the right hand side.
-4. Use **File ▸ Generate Code…** (`Ctrl+G`) to review the generated designer file and write
+3. Toggle the toolbox, properties pane, snap to grid, alignment guides and ruler from the
+   **View** menu or the ribbon.
+4. Select a control to edit its properties on the right hand side.
+5. Use **File ▸ Generate Code…** (`Ctrl+G`) to review the generated designer file and write
    the whole project to a folder. The folder contains a runnable project:
 
    ```

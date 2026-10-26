@@ -96,6 +96,24 @@ public sealed class DesignerSurface : Panel
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public bool ShowAlignmentGuides { get; set; } = true;
 
+    private bool _showRuler;
+    /// <summary>Shows a pixel ruler along the top and left edges of the canvas.</summary>
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public bool ShowRuler
+    {
+        get => _showRuler;
+        set
+        {
+            if (_showRuler == value)
+            {
+                return;
+            }
+
+            _showRuler = value;
+            Invalidate();
+        }
+    }
+
     /// <summary>Raised as the pointer moves over the design surface.</summary>
     public event EventHandler<DesignerPointEventArgs>? PointerMoved;
 
@@ -118,6 +136,11 @@ public sealed class DesignerSurface : Panel
         }
 
         graphics.DrawImageUnscaled(_renderedForm, _formLocation);
+
+        if (ShowRuler)
+        {
+            PaintRuler(graphics);
+        }
 
         if (_session.SelectedNodes.Count > 0)
         {
@@ -665,6 +688,47 @@ public sealed class DesignerSurface : Panel
     private int Snap(int value)
         => (int)Math.Round(value / (double)GridSize, MidpointRounding.AwayFromZero) * GridSize;
 
+    private void PaintRuler(Graphics graphics)
+    {
+        var width = _canvas.Width;
+        var height = _canvas.Height;
+        var margin = CanvasMargin;
+
+        using var background = new SolidBrush(Color.FromArgb(245, 245, 245));
+        using var borderPen = new Pen(Color.FromArgb(170, 170, 170));
+        using var tickPen = new Pen(Color.FromArgb(120, 120, 120));
+        using var textBrush = new SolidBrush(Color.FromArgb(80, 80, 80));
+        using var font = new Font(SystemFonts.DefaultFont.FontFamily, 7f);
+
+        graphics.FillRectangle(background, 0, 0, width, margin);
+        graphics.FillRectangle(background, 0, 0, margin, height);
+        graphics.DrawLine(borderPen, 0, margin - 1, width, margin - 1);
+        graphics.DrawLine(borderPen, margin - 1, 0, margin - 1, height);
+
+        for (var x = 0; x <= width; x += 10)
+        {
+            var major = x % 50 == 0;
+            var tickHeight = major ? margin : margin / 2;
+            graphics.DrawLine(tickPen, x, margin - tickHeight, x, margin - 1);
+            if (major && x > 0)
+            {
+                graphics.DrawString(x.ToString(), font, textBrush, x + 2, 2);
+            }
+        }
+
+        for (var y = 0; y <= height; y += 10)
+        {
+            var major = y % 50 == 0;
+            var tickWidth = major ? margin : margin / 2;
+            graphics.DrawLine(tickPen, margin - tickWidth, y, margin - 1, y);
+            if (major && y > 0)
+            {
+                graphics.DrawString(y.ToString(), font, textBrush, 2, y + 2);
+            }
+        }
+    }
+
+
     private void PaintAlignmentGuides(Graphics graphics, Rectangle selectedBounds, DesignNode selected)
     {
         if (_session is null || selected.Parent is null)
@@ -753,8 +817,8 @@ public sealed class DesignerSurface : Panel
     {
         if (data?.GetDataPresent(ToolboxDrag.DataFormat) != true
             || data.GetData(ToolboxDrag.DataFormat) is not Type type
-            || !typeof(Control).IsAssignableFrom(type)
-            || !ControlFactory.IsCreatable(type))
+            || !ControlFactory.IsCreatable(type)
+            || (!typeof(Control).IsAssignableFrom(type) && !ControlFactory.IsComponent(type)))
         {
             return null;
         }

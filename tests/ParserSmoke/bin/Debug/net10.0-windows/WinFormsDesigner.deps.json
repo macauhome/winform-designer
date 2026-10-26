@@ -8,10 +8,30 @@
     ".NETCoreApp,Version=v10.0": {
       "WinFormsDesigner/1.0.0": {
         "dependencies": {
+          "Krypton.Ribbon": "105.26.7.201",
           "WinFormsDesigner.Core": "1.0.0"
         },
         "runtime": {
           "WinFormsDesigner.dll": {}
+        }
+      },
+      "Krypton.Ribbon/105.26.7.201": {
+        "dependencies": {
+          "Krypton.Toolkit": "105.26.7.201"
+        },
+        "runtime": {
+          "lib/net10.0-windows7.0/Krypton.Ribbon.dll": {
+            "assemblyVersion": "105.26.7.201",
+            "fileVersion": "105.26.7.201"
+          }
+        }
+      },
+      "Krypton.Toolkit/105.26.7.201": {
+        "runtime": {
+          "lib/net10.0-windows7.0/Krypton.Toolkit.dll": {
+            "assemblyVersion": "105.26.7.201",
+            "fileVersion": "105.26.7.201"
+          }
         }
       },
       "WinFormsDesigner.Core/1.0.0": {
@@ -29,6 +49,20 @@
       "type": "project",
       "serviceable": false,
       "sha512": ""
+    },
+    "Krypton.Ribbon/105.26.7.201": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-uJhMEFVuxBWyv4XRLgjdraTeyv7h5HR1afSOEd4lv/rCMDCXKePrwg8mkVZ94vmcx6leRCA8ku7s0RX/EoqxKQ==",
+      "path": "krypton.ribbon/105.26.7.201",
+      "hashPath": "krypton.ribbon.105.26.7.201.nupkg.sha512"
+    },
+    "Krypton.Toolkit/105.26.7.201": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-Wxr2n7YYR21vtQIsy4csAQhn0v6AcHdD7SX2qOl/Bb/QGpkyUz1a8IxqOWp4VCyaBPUNPNeTNOWfECI7/UrkJw==",
+      "path": "krypton.toolkit/105.26.7.201",
+      "hashPath": "krypton.toolkit.105.26.7.201.nupkg.sha512"
     },
     "WinFormsDesigner.Core/1.0.0": {
       "type": "project",

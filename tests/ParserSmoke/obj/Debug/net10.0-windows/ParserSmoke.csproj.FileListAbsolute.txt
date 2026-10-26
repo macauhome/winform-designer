@@ -24,3 +24,5 @@ D:\Ken\Ken\MyPrograms\winformdesginer\tests\ParserSmoke\obj\Debug\net10.0-window
 D:\Ken\Ken\MyPrograms\winformdesginer\tests\ParserSmoke\obj\Debug\net10.0-windows\ParserSmoke.pdb
 D:\Ken\Ken\MyPrograms\winformdesginer\tests\ParserSmoke\obj\Debug\net10.0-windows\ParserSmoke.genruntimeconfig.cache
 D:\Ken\Ken\MyPrograms\winformdesginer\tests\ParserSmoke\obj\Debug\net10.0-windows\ref\ParserSmoke.dll
+D:\Ken\Ken\MyPrograms\winformdesginer\tests\ParserSmoke\bin\Debug\net10.0-windows\Krypton.Ribbon.dll
+D:\Ken\Ken\MyPrograms\winformdesginer\tests\ParserSmoke\bin\Debug\net10.0-windows\Krypton.Toolkit.dll

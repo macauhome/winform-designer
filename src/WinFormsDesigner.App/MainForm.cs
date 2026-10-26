@@ -62,6 +62,13 @@ public sealed class MainForm : Form
     private readonly ToolStripMenuItem _showProperties = new();
     private readonly ToolStripMenuItem _snapToGrid = new();
     private readonly ToolStripMenuItem _showGuides = new();
+    private readonly ToolStripMenuItem _showRuler = new();
+
+    private KryptonRibbonGroupButton _ribbonToolbox = new();
+    private KryptonRibbonGroupButton _ribbonProps = new();
+    private KryptonRibbonGroupButton _ribbonSnap = new();
+    private KryptonRibbonGroupButton _ribbonGuides = new();
+    private KryptonRibbonGroupButton _ribbonRuler = new();
 
     private DesignSession _session = new();
     private string? _currentFilePath;
@@ -155,6 +162,11 @@ public sealed class MainForm : Form
         ConfigureToggle(_showProperties, "Properties", ToggleProperties);
         ConfigureToggle(_snapToGrid, "Snap to Grid", ToggleSnapToGrid);
         ConfigureToggle(_showGuides, "Alignment Guides", ToggleGuides);
+        ConfigureToggle(_showRuler, "Ruler", ToggleRuler);
+
+        _showToolbox.Checked = true;
+        _showProperties.Checked = true;
+        _showGuides.Checked = true;
 
         var file = new ToolStripMenuItem("&File");
         file.DropDownItems.Add(Item("&New Form", Keys.Control | Keys.N, (_, _) => NewDocument()));
@@ -182,6 +194,7 @@ public sealed class MainForm : Form
         view.DropDownItems.Add(new ToolStripSeparator());
         view.DropDownItems.Add(_snapToGrid);
         view.DropDownItems.Add(_showGuides);
+        view.DropDownItems.Add(_showRuler);
 
         var format = new ToolStripMenuItem("F&ormat");
         format.DropDownItems.Add(Item("Bring to &Front", Keys.Control | Keys.Oem6, (_, _) => BringSelectionToFront()));
@@ -218,8 +231,7 @@ public sealed class MainForm : Form
     private void ConfigureToggle(ToolStripMenuItem item, string text, Action handler)
     {
         item.Text = text;
-        item.CheckOnClick = true;
-        item.Checked = true;
+        item.CheckOnClick = false;
         item.Click += (_, _) => handler();
     }
 
@@ -267,10 +279,16 @@ public sealed class MainForm : Form
 
         var viewGroup = new KryptonRibbonGroup { TextLine1 = "View" };
         var viewLines = new KryptonRibbonGroupLines();
-        AddRibbonButton(viewLines, "Toolbox", IconToolbox, ToggleToolbox);
-        AddRibbonButton(viewLines, "Props", IconProps, ToggleProperties);
-        AddRibbonButton(viewLines, "Snap", IconSnap, ToggleSnapToGrid);
-        AddRibbonButton(viewLines, "Guides", IconGuides, ToggleGuides);
+        _ribbonToolbox = AddRibbonButton(viewLines, "Toolbox", IconToolbox, ToggleToolbox);
+        _ribbonToolbox.Checked = _showToolbox.Checked;
+        _ribbonProps = AddRibbonButton(viewLines, "Props", IconProps, ToggleProperties);
+        _ribbonProps.Checked = _showProperties.Checked;
+        _ribbonSnap = AddRibbonButton(viewLines, "Snap", IconSnap, ToggleSnapToGrid);
+        _ribbonSnap.Checked = _snapToGrid.Checked;
+        _ribbonGuides = AddRibbonButton(viewLines, "Guides", IconGuides, ToggleGuides);
+        _ribbonGuides.Checked = _showGuides.Checked;
+        _ribbonRuler = AddRibbonButton(viewLines, "Ruler", IconGuides, ToggleRuler);
+        _ribbonRuler.Checked = _showRuler.Checked;
         viewGroup.Items.Add(viewLines);
         home.Groups.Add(viewGroup);
 
@@ -473,18 +491,39 @@ private void BuildStatusBar()
         FocusSurface();
     }
 
-    private void ToggleSnapToGrid() => _surface.SnapToGrid = _snapToGrid.Checked;
+    private void ToggleSnapToGrid()
+    {
+        _snapToGrid.Checked = !_snapToGrid.Checked;
+        _surface.SnapToGrid = _snapToGrid.Checked;
+        _ribbonSnap.Checked = _snapToGrid.Checked;
+    }
 
-    private void ToggleGuides() => _surface.ShowAlignmentGuides = _showGuides.Checked;
+    private void ToggleGuides()
+    {
+        _showGuides.Checked = !_showGuides.Checked;
+        _surface.ShowAlignmentGuides = _showGuides.Checked;
+        _ribbonGuides.Checked = _showGuides.Checked;
+    }
+
+    private void ToggleRuler()
+    {
+        _showRuler.Checked = !_showRuler.Checked;
+        _surface.ShowRuler = _showRuler.Checked;
+        _ribbonRuler.Checked = _showRuler.Checked;
+    }
 
     private void ToggleToolbox()
     {
+        _showToolbox.Checked = !_showToolbox.Checked;
         _shell.ShowToolbox = _showToolbox.Checked;
+        _ribbonToolbox.Checked = _showToolbox.Checked;
     }
 
     private void ToggleProperties()
     {
+        _showProperties.Checked = !_showProperties.Checked;
         _shell.ShowProperties = _showProperties.Checked;
+        _ribbonProps.Checked = _showProperties.Checked;
     }
 
     private void OnControlRequested(object? sender, ToolboxEntryEventArgs e)

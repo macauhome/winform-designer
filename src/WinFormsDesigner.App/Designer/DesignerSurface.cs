@@ -27,12 +27,13 @@ public sealed class DesignerSurface : Panel
     private Rectangle _gestureStartBounds;
     private Point _gestureStartPointer;
     private ResizeEdges _resizeEdges;
+    private readonly List<(DesignNode Node, Control Control, Rectangle StartBounds)> _gestureGroup = [];
 
     public DesignerSurface()
     {
         AutoScroll = true;
         AutoScrollMinSize = Size.Empty;
-        BackColor = SystemColors.Control;
+        BackColor = Color.White;
         TabStop = true;
         AllowDrop = true;
         SetStyle(
@@ -118,25 +119,49 @@ public sealed class DesignerSurface : Panel
 
         graphics.DrawImageUnscaled(_renderedForm, _formLocation);
 
-        if (_session.SelectedNode is { } selected && _session.GetLive(selected) is { } control)
+        if (_session.SelectedNodes.Count > 0)
         {
-            var bounds = ControlBoundsOnCanvas(control);
-            bounds.Inflate(1, 1);
-
-            using var selectionPen = new Pen(Color.RoyalBlue, 1) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
-            graphics.DrawRectangle(selectionPen, bounds);
-
-            using var handleBrush = new SolidBrush(Color.White);
-            using var handlePen = new Pen(Color.RoyalBlue);
-            foreach (var handle in GetHandleBounds(bounds))
+            foreach (var selectedNode in _session.SelectedNodes)
             {
-                graphics.FillRectangle(handleBrush, handle);
-                graphics.DrawRectangle(handlePen, handle);
-            }
+                if (_session.GetLive(selectedNode) is not { } control)
+                {
+                    continue;
+                }
 
-            if (ShowAlignmentGuides && IsPointerCaptured && _gestureMode == GestureMode.Move)
-            {
-                PaintAlignmentGuides(graphics, bounds, selected);
+                var bounds = ControlBoundsOnCanvas(control);
+                bounds.Inflate(1, 1);
+
+                var isPrimary = ReferenceEquals(selectedNode, _session.SelectedNode);
+                using var selectionPen = new Pen(isPrimary ? Color.RoyalBlue : Color.CornflowerBlue, 1)
+                {
+                    DashStyle = System.Drawing.Drawing2D.DashStyle.Dash,
+                };
+                graphics.DrawRectangle(selectionPen, bounds);
+
+                var markSize = 8;
+                var mark = new Rectangle(bounds.Left + 2, bounds.Top + 2, markSize, markSize);
+                using (var markBrush = new SolidBrush(isPrimary ? Color.RoyalBlue : Color.CornflowerBlue))
+                using (var markPen = new Pen(Color.White))
+                {
+                    graphics.FillEllipse(markBrush, mark);
+                    graphics.DrawEllipse(markPen, mark);
+                }
+
+                if (isPrimary)
+                {
+                    using var handleBrush = new SolidBrush(Color.White);
+                    using var handlePen = new Pen(Color.RoyalBlue);
+                    foreach (var handle in GetHandleBounds(bounds))
+                    {
+                        graphics.FillRectangle(handleBrush, handle);
+                        graphics.DrawRectangle(handlePen, handle);
+                    }
+
+                    if (ShowAlignmentGuides && IsPointerCaptured && _gestureMode == GestureMode.Move)
+                    {
+                        PaintAlignmentGuides(graphics, bounds, selectedNode);
+                    }
+                }
             }
         }
     }
@@ -230,9 +255,11 @@ public sealed class DesignerSurface : Panel
             return;
         }
 
+        var shiftPressed = (Control.ModifierKeys & Keys.Shift) == Keys.Shift;
+
         var selected = _session.SelectedNode;
         var selectedControl = selected is null ? null : _session.GetLive(selected);
-        if (selected is not null && selectedControl is not null)
+        if (!shiftPressed && selected is not null && selectedControl is not null && _session.SelectedNodes.Count <= 1)
         {
             var edges = GetResizeEdges(ControlBoundsOnCanvas(selectedControl), canvasPoint);
             if (edges != ResizeEdges.None)
@@ -251,11 +278,23 @@ public sealed class DesignerSurface : Panel
 
         if (hit is null)
         {
-            _session.Select(null);
+            if (!shiftPressed)
+            {
+                _session.ClearSelection();
+            }
             return;
         }
 
-        _session.Select(hit);
+        if (shiftPressed)
+        {
+            _session.ToggleSelection(hit);
+            return;
+        }
+
+        if (!_session.SelectedNodes.Contains(hit))
+        {
+            _session.Select(hit);
+        }
 
         var hitControl = _session.GetLive(hit);
         if (hit.Parent is not null && hitControl is not null)
@@ -275,6 +314,7 @@ public sealed class DesignerSurface : Panel
 
     private void StartGesture(DesignNode node, Control control, ResizeEdges edges, Point canvasPoint)
     {
+        _gestureGroup.Clear();
         _gestureNode = node;
         _gestureControl = control;
         _gestureStartBounds = node.Parent is null
@@ -286,12 +326,55 @@ public sealed class DesignerSurface : Panel
         _canvas.Capture = true;
         Cursor = CursorFor(edges);
         Cursor.Current = Cursor;
+
+        if (_gestureMode == GestureMode.Move && _session is not null && _session.SelectedNodes.Count > 1
+            && _session.SelectedNodes.Contains(node))
+        {
+            foreach (var selectedNode in _session.SelectedNodes)
+            {
+                if (selectedNode.Parent is null)
+                {
+                    continue;
+                }
+
+                if (_session.GetLive(selectedNode) is Control live)
+                {
+                    _gestureGroup.Add((selectedNode, live, live.Bounds));
+                }
+            }
+
+            if (_gestureGroup.Count <= 1)
+            {
+                _gestureGroup.Clear();
+            }
+        }
     }
 
     private void UpdateGesture(Point canvasPoint)
     {
         if (_gestureControl is null)
         {
+            return;
+        }
+
+        if (_gestureGroup.Count > 0 && _gestureMode == GestureMode.Move)
+        {
+            var groupDelta = new Size(canvasPoint.X - _gestureStartPointer.X, canvasPoint.Y - _gestureStartPointer.Y);
+            foreach (var groupItem in _gestureGroup)
+            {
+                var groupBounds = groupItem.StartBounds;
+                groupBounds.Offset(groupDelta.Width, groupDelta.Height);
+                if (SnapToGrid)
+                {
+                    groupBounds.X = Snap(groupBounds.X);
+                    groupBounds.Y = Snap(groupBounds.Y);
+                }
+
+                groupItem.Control.Bounds = groupBounds;
+            }
+
+            InvalidateRenderedForm();
+            _canvas.Invalidate();
             return;
         }
 
@@ -409,6 +492,9 @@ public sealed class DesignerSurface : Panel
             UpdateGesture(canvasPoint);
         }
 
+        var group = _gestureGroup.ToList();
+        _gestureGroup.Clear();
+
         var node = _gestureNode;
         var control = _gestureControl;
         var gestureMode = _gestureMode;
@@ -425,7 +511,25 @@ public sealed class DesignerSurface : Panel
         Cursor = Cursors.Default;
         Cursor.Current = Cursors.Default;
 
-        if (control is not null)
+        if (group.Count > 0)
+        {
+            if (commit && _session is not null && gestureMode == GestureMode.Move)
+            {
+                _session.PushUndo();
+                foreach (var groupItem in group)
+                {
+                    _session.CommitBounds(groupItem.Node, groupItem.StartBounds, groupItem.Control.Bounds, pushUndo: false);
+                }
+            }
+            else
+            {
+                foreach (var groupItem in group)
+                {
+                    groupItem.Control.Bounds = groupItem.StartBounds;
+                }
+            }
+        }
+        else if (control is not null)
         {
             if (commit && node is not null && _session is not null
                 && !(ReferenceEquals(control, _session.RootForm) && gestureMode == GestureMode.Move))
@@ -706,7 +810,7 @@ public sealed class DesignerSurface : Panel
     {
         public DesignCanvas()
         {
-            BackColor = Color.FromArgb(0xF0, 0xF0, 0xF0);
+            BackColor = Color.White;
             SetStyle(
                 ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint
                     | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw,

@@ -29,7 +29,7 @@ public sealed class DesignerShellLayout : Panel
     private const int MinPropertiesWidth = 220;
     private const int MinSurfaceWidth = 320;
 
-    private static readonly Color BackgroundColor = Color.FromArgb(0xF0, 0xF0, 0xF0);
+    private static readonly Color BackgroundColor = Color.White;
     private static readonly Color SplitterColor = Color.FromArgb(0xD4, 0xD4, 0xD4);
     private static readonly Color SplitterLineColor = Color.FromArgb(0xA0, 0xA0, 0xA0);
 

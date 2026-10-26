@@ -48,6 +48,7 @@ public sealed class MainForm : Form
         Size = new Size(1280, 820);
         MinimumSize = new Size(900, 600);
         Font = SystemFonts.MessageBoxFont;
+        BackColor = Color.White;
 
         BuildLayout();
         BuildMenu();
@@ -132,6 +133,8 @@ public sealed class MainForm : Form
         var file = new ToolStripMenuItem("&File");
         file.DropDownItems.Add(Item("&New Form", Keys.Control | Keys.N, (_, _) => NewDocument()));
         file.DropDownItems.Add(Item("&Open...", Keys.Control | Keys.O, (_, _) => OpenFile()));
+        file.DropDownItems.Add(Item("&Save", Keys.Control | Keys.S, (_, _) => Save()));
+        file.DropDownItems.Add(Item("Save &As...", Keys.Control | Keys.Shift | Keys.S, (_, _) => GenerateCode()));
         file.DropDownItems.Add(Item("&Generate Code...", Keys.Control | Keys.G, (_, _) => GenerateCode()));
         file.DropDownItems.Add(new ToolStripSeparator());
         file.DropDownItems.Add(Item("E&xit", Keys.Alt | Keys.F4, (_, _) => Close()));
@@ -415,6 +418,11 @@ public sealed class MainForm : Form
         _statusPointer.Text = $"{e.Location.X}, {e.Location.Y}";
     }
 
+    private void Save()
+    {
+        GenerateCode();
+    }
+
     private void GenerateCode()
     {
         using var dialog = new GenerateCodeDialog(_session.Document);
@@ -547,9 +555,17 @@ public sealed class MainForm : Form
             return;
         }
 
+        var count = _session.SelectedNodes.Count;
         var live = _session.GetLive(node);
         var size = live is null ? string.Empty : $"  {live.Size.Width} x {live.Size.Height}";
-        _statusSelection.Text = $"{node.ControlType.Name}  ({node.Name}){size}";
+        if (count > 1)
+        {
+            _statusSelection.Text = $"{count} controls selected{size}";
+        }
+        else
+        {
+            _statusSelection.Text = $"{node.ControlType.Name}  ({node.Name}){size}";
+        }
     }
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)

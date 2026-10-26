@@ -10,6 +10,7 @@ namespace WinFormsDesigner.App.Designer;
 /// </summary>
 public sealed class DesignSession
 {
+    private readonly List<DesignNode> _selectedNodes = [];
     private readonly Dictionary<DesignNode, Control> _live = [];
     private readonly Dictionary<DesignNode, object> _components = [];
     private readonly List<SessionSnapshot> _undo = [];
@@ -45,7 +46,10 @@ public sealed class DesignSession
     public Form RootForm { get; }
 
     /// <summary>Currently selected node, or <c>null</c> when nothing is selected.</summary>
-    public DesignNode? SelectedNode { get; private set; }
+    public DesignNode? SelectedNode => _selectedNodes.Count == 0 ? null : _selectedNodes[_selectedNodes.Count - 1];
+
+    /// <summary>All currently selected nodes.</summary>
+    public IReadOnlyList<DesignNode> SelectedNodes => _selectedNodes;
 
     /// <summary>Currently selected live control, or <c>null</c>.</summary>
     public Control? SelectedControl => SelectedNode is null ? null : GetLive(SelectedNode);
@@ -108,15 +112,79 @@ public sealed class DesignSession
         return null;
     }
 
-    /// <summary>Selects a node.</summary>
-    public void Select(DesignNode? node)
+    /// <summary>Selects a node, replacing the current selection unless <paramref name="addToSelection"/> is set.</summary>
+    public void Select(DesignNode? node, bool addToSelection = false)
     {
-        if (ReferenceEquals(SelectedNode, node))
+        if (node is null)
+        {
+            if (_selectedNodes.Count == 0)
+            {
+                return;
+            }
+
+            _selectedNodes.Clear();
+            SelectionChanged?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
+        if (addToSelection)
+        {
+            if (!_selectedNodes.Contains(node))
+            {
+                _selectedNodes.Add(node);
+                SelectionChanged?.Invoke(this, EventArgs.Empty);
+            }
+
+            return;
+        }
+
+        if (_selectedNodes.Count == 1 && ReferenceEquals(_selectedNodes[0], node))
         {
             return;
         }
 
-        SelectedNode = node;
+        _selectedNodes.Clear();
+        _selectedNodes.Add(node);
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Toggles a node in the current selection.</summary>
+    public void ToggleSelection(DesignNode node)
+    {
+        if (_selectedNodes.Remove(node))
+        {
+            SelectionChanged?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
+        _selectedNodes.Add(node);
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Clears the current selection.</summary>
+    public void ClearSelection()
+    {
+        if (_selectedNodes.Count == 0)
+        {
+            return;
+        }
+
+        _selectedNodes.Clear();
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Replaces the current selection with the given nodes.</summary>
+    public void SelectNodes(IEnumerable<DesignNode> nodes)
+    {
+        _selectedNodes.Clear();
+        foreach (var node in nodes)
+        {
+            if (!_selectedNodes.Contains(node))
+            {
+                _selectedNodes.Add(node);
+            }
+        }
+
         SelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -206,23 +274,36 @@ public sealed class DesignSession
         return node;
     }
 
-    /// <summary>Removes the selected control.</summary>
+    /// <summary>Removes the selected controls.</summary>
     public bool DeleteSelection()
     {
-        if (SelectedNode is null || SelectedNode.Parent is null)
+        var nodes = _selectedNodes.Where(n => n.Parent is not null).Distinct().ToList();
+        if (nodes.Count == 0)
         {
             return false;
         }
 
-        var node = SelectedNode;
-        var parent = node.Parent;
+        var parents = nodes.Select(n => n.Parent).Distinct().ToList();
 
         PushUndo();
-        parent.Children.Remove(node);
-        node.Parent = null;
+        foreach (var node in nodes)
+        {
+            node.Parent!.Children.Remove(node);
+            node.Parent = null;
+        }
+
+        _selectedNodes.Clear();
 
         RebuildLiveTree();
-        Select(parent);
+        if (parents.Count == 1 && parents[0] is not null)
+        {
+            Select(parents[0]);
+        }
+        else
+        {
+            Select(Document.Root);
+        }
+
         RaiseChanged();
         return true;
     }
@@ -383,7 +464,7 @@ public sealed class DesignSession
     }
 
     /// <summary>Commits bounds that were already applied to the live control during a gesture.</summary>
-    public void CommitBounds(DesignNode node, Rectangle originalBounds, Rectangle bounds)
+    public void CommitBounds(DesignNode node, Rectangle originalBounds, Rectangle bounds, bool pushUndo = true)
     {
         var live = GetLive(node);
         if (live is null || originalBounds == bounds)
@@ -391,7 +472,11 @@ public sealed class DesignSession
             return;
         }
 
-        PushUndo();
+        if (pushUndo)
+        {
+            PushUndo();
+        }
+
         if (node.Parent is null)
         {
             SetStoredProperty(node, "ClientSize", bounds.Size);
@@ -516,13 +601,11 @@ public sealed class DesignSession
     /// <summary>Copies the selected controls into the internal clipboard.</summary>
     public void CopySelection()
     {
-        if (SelectedNode?.Parent is null)
-        {
-            return;
-        }
-
         _clipboard.Clear();
-        _clipboard.Add(CloneSubtree(SelectedNode));
+        foreach (var node in _selectedNodes.Where(n => n.Parent is not null))
+        {
+            _clipboard.Add(CloneSubtree(node));
+        }
     }
 
     /// <summary>Cuts the selected controls into the internal clipboard.</summary>
@@ -544,6 +627,7 @@ public sealed class DesignSession
         PushUndo();
 
         var offset = new Point(10, 10);
+        var pasted = new List<DesignNode>();
         foreach (var clipboardNode in _clipboard)
         {
             var copy = CloneSubtree(clipboardNode);
@@ -555,12 +639,17 @@ public sealed class DesignSession
             }
             copy.Parent = parent;
             parent.Children.Insert(0, copy);
-            copy.Properties.SetValue("Location", new Point(
-                (copy.Properties.TryGetValue("Location", out var l) && l is Point p ? p.X : 0) + offset.X,
-                (copy.Properties.TryGetValue("Location", out var l2) && l2 is Point p2 ? p2.Y : 0) + offset.Y));
+            if (!typeof(System.Windows.Forms.TableLayoutPanel).IsAssignableFrom(parent.ControlType))
+            {
+                copy.Properties.SetValue("Location", new Point(
+                    (copy.Properties.TryGetValue("Location", out var l) && l is Point p ? p.X : 0) + offset.X,
+                    (copy.Properties.TryGetValue("Location", out var l2) && l2 is Point p2 ? p2.Y : 0) + offset.Y));
+            }
+            pasted.Add(copy);
         }
 
         RebuildLiveTree();
+        SelectNodes(pasted);
         RaiseChanged();
     }
 
@@ -651,7 +740,7 @@ public sealed class DesignSession
         return snapshot;
     }
 
-    private void PushUndo()
+    public void PushUndo()
     {
         _undo.Add(CaptureSnapshot());
         if (_undo.Count > 100)
@@ -1016,6 +1105,14 @@ public sealed class DesignSession
     /// <summary>Returns the node that receives a newly inserted control.</summary>
     public DesignNode GetInsertionParent()
     {
+        foreach (var selectedNode in Enumerable.Reverse(_selectedNodes))
+        {
+            if (IsContainer(selectedNode.ControlType))
+            {
+                return selectedNode;
+            }
+        }
+
         if (SelectedNode is null)
         {
             return Document.Root;

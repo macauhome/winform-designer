@@ -1,10 +1,14 @@
 using System.Drawing;
+using System.Drawing.Text;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
 using WinFormsDesigner.App.Designer;
 using WinFormsDesigner.App.Layout;
 using WinFormsDesigner.App.Properties;
 using WinFormsDesigner.App.Toolbox;
+using Krypton.Ribbon;
+using Krypton.Toolkit;
 using WinFormsDesigner.Core.Codegen;
 using WinFormsDesigner.Core.Model;
 
@@ -20,7 +24,29 @@ public sealed class MainForm : Form
     private const int PropertiesWidth = 330;
 
     private readonly MenuStrip _menu = new();
-    private readonly ToolStrip _toolbar = new();
+    private readonly KryptonRibbon _ribbon = new();
+
+    // CoreUI free icon font (embedded resource).
+    private static readonly PrivateFontCollection CoreUiFonts = new();
+    private static IntPtr _coreUiFontMemory = IntPtr.Zero;
+    private static FontFamily? _coreUiFontFamily;
+
+    private const char IconNew = '\uF1A1';
+    private const char IconOpen = '\uF24D';
+    private const char IconSave = '\uF188';
+    private const char IconCode = '\uF28F';
+    private const char IconCut = '\uF279';
+    private const char IconCopy = '\uF280';
+    private const char IconPaste = '\uF297';
+    private const char IconDelete = '\uF134';
+    private const char IconUndo = '\uF32E';
+    private const char IconRedo = '\uF32F';
+    private const char IconFront = '\uF309';
+    private const char IconBack = '\uF31C';
+    private const char IconToolbox = '\uF31F';
+    private const char IconProps = '\uF181';
+    private const char IconSnap = '\uF227';
+    private const char IconGuides = '\uF1FA';
     private readonly StatusStrip _status = new();
 
     private readonly DesignerShellLayout _shell = new();
@@ -52,7 +78,7 @@ public sealed class MainForm : Form
 
         BuildLayout();
         BuildMenu();
-        BuildToolbar();
+        BuildRibbon();
         BuildStatusBar();
 
         AttachSession(_session);
@@ -82,13 +108,13 @@ public sealed class MainForm : Form
         _shell.PropertiesWidth = PropertiesWidth;
 
         _menu.Dock = DockStyle.Top;
-        _toolbar.Dock = DockStyle.Top;
+        _ribbon.Dock = DockStyle.Top;
         _status.Dock = DockStyle.Bottom;
 
         // The docking order runs from the last added control to the first one, so the
         // status bar claims the bottom, the menu the top and the toolbar sits below it.
         Controls.Add(_shell);
-        Controls.Add(_toolbar);
+        Controls.Add(_ribbon);
         Controls.Add(_menu);
         Controls.Add(_status);
     }
@@ -201,42 +227,103 @@ public sealed class MainForm : Form
     // Toolbar and status bar
     // ---------------------------------------------------------------------
 
-    private void BuildToolbar()
+    private void BuildRibbon()
     {
-        _toolbar.GripStyle = ToolStripGripStyle.Hidden;
-        _toolbar.RenderMode = ToolStripRenderMode.System;
+        _ribbon.PaletteMode = PaletteMode.Office2010Blue;
 
-        _toolbar.Items.Add(ToolButton("New", NewDocument));
-        _toolbar.Items.Add(new ToolStripSeparator());
-        _toolbar.Items.Add(ToolButton("Undo", Undo));
-        _toolbar.Items.Add(ToolButton("Redo", Redo));
-        _toolbar.Items.Add(new ToolStripSeparator());
-        _toolbar.Items.Add(ToolButton("Cut", Cut));
-        _toolbar.Items.Add(ToolButton("Copy", Copy));
-        _toolbar.Items.Add(ToolButton("Paste", Paste));
-        _toolbar.Items.Add(ToolButton("Delete", Delete));
-        _toolbar.Items.Add(new ToolStripSeparator());
-        _toolbar.Items.Add(ToolButton("Front", BringSelectionToFront));
-        _toolbar.Items.Add(ToolButton("Back", SendSelectionToBack));
-        _toolbar.Items.Add(new ToolStripSeparator());
-        _toolbar.Items.Add(ToolButton("Code", GenerateCode));
+        var home = new KryptonRibbonTab { Text = "Home" };
+
+        var fileGroup = new KryptonRibbonGroup { TextLine1 = "File" };
+        var fileLines = new KryptonRibbonGroupLines();
+        AddRibbonButton(fileLines, "New", IconNew, NewDocument, Keys.Control | Keys.N);
+        AddRibbonButton(fileLines, "Open", IconOpen, OpenFile, Keys.Control | Keys.O);
+        AddRibbonButton(fileLines, "Save", IconSave, Save, Keys.Control | Keys.S);
+        AddRibbonButton(fileLines, "Code", IconCode, GenerateCode, Keys.Control | Keys.G);
+        fileGroup.Items.Add(fileLines);
+        home.Groups.Add(fileGroup);
+
+        var clipGroup = new KryptonRibbonGroup { TextLine1 = "Clipboard" };
+        var clipLines = new KryptonRibbonGroupLines();
+        AddRibbonButton(clipLines, "Cut", IconCut, Cut, Keys.Control | Keys.X);
+        AddRibbonButton(clipLines, "Copy", IconCopy, Copy, Keys.Control | Keys.C);
+        AddRibbonButton(clipLines, "Paste", IconPaste, Paste, Keys.Control | Keys.V);
+        AddRibbonButton(clipLines, "Delete", IconDelete, Delete, Keys.Delete);
+        clipGroup.Items.Add(clipLines);
+        home.Groups.Add(clipGroup);
+
+        var historyGroup = new KryptonRibbonGroup { TextLine1 = "History" };
+        var historyLines = new KryptonRibbonGroupLines();
+        AddRibbonButton(historyLines, "Undo", IconUndo, Undo, Keys.Control | Keys.Z);
+        AddRibbonButton(historyLines, "Redo", IconRedo, Redo, Keys.Control | Keys.Y);
+        historyGroup.Items.Add(historyLines);
+        home.Groups.Add(historyGroup);
+
+        var arrangeGroup = new KryptonRibbonGroup { TextLine1 = "Arrange" };
+        var arrangeLines = new KryptonRibbonGroupLines();
+        AddRibbonButton(arrangeLines, "Front", IconFront, BringSelectionToFront);
+        AddRibbonButton(arrangeLines, "Back", IconBack, SendSelectionToBack);
+        arrangeGroup.Items.Add(arrangeLines);
+        home.Groups.Add(arrangeGroup);
+
+        var viewGroup = new KryptonRibbonGroup { TextLine1 = "View" };
+        var viewLines = new KryptonRibbonGroupLines();
+        AddRibbonButton(viewLines, "Toolbox", IconToolbox, ToggleToolbox);
+        AddRibbonButton(viewLines, "Props", IconProps, ToggleProperties);
+        AddRibbonButton(viewLines, "Snap", IconSnap, ToggleSnapToGrid);
+        AddRibbonButton(viewLines, "Guides", IconGuides, ToggleGuides);
+        viewGroup.Items.Add(viewLines);
+        home.Groups.Add(viewGroup);
+
+        _ribbon.RibbonTabs.Add(home);
+        _ribbon.SelectedTab = home;
     }
 
-    private static ToolStripButton ToolButton(string text, Action handler)
+    private KryptonRibbonGroupButton AddRibbonButton(KryptonRibbonGroupLines lines, string text, char iconGlyph, Action handler, Keys shortcut = Keys.None)
     {
-        var button = new ToolStripButton(text)
+        var button = new KryptonRibbonGroupButton
         {
-            DisplayStyle = ToolStripItemDisplayStyle.Text,
-            AutoSize = true,
+            TextLine1 = text,
+            ImageLarge = CreateRibbonIcon(iconGlyph.ToString(), 32),
+            ImageSmall = CreateRibbonIcon(iconGlyph.ToString(), 16),
+            ShortcutKeys = shortcut,
         };
-
         button.Click += (_, _) => handler();
+        lines!.Items!.Add(button);
         return button;
     }
 
-    private void BuildStatusBar()
+    private static Image CreateRibbonIcon(string glyph, int size)
     {
-        _statusSelection.Spring = true;
+    EnsureCoreUiFont();
+    var bmp = new Bitmap(size, size);
+        using var g = Graphics.FromImage(bmp);
+        g.Clear(Color.Transparent);
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+        using var font = new Font(_coreUiFontFamily!, size * 0.7f, FontStyle.Regular, GraphicsUnit.Pixel);
+        var measured = g.MeasureString(glyph, font);
+        using var brush = new SolidBrush(Color.Black);
+        g.DrawString(glyph, font, brush, (size - measured.Width) / 2f, (size - measured.Height) / 2f);
+        return bmp;
+    }
+
+private static void EnsureCoreUiFont()
+    {
+        if (_coreUiFontFamily != null) return;
+        var asm = typeof(MainForm).Assembly;
+        const string resourceName = "WinFormsDesigner.App.Assets.CoreUI-Icons-Free.ttf";
+        using var stream = asm.GetManifestResourceStream(resourceName);
+        if (stream == null)
+            throw new InvalidOperationException("Embedded icon font resource not found: " + resourceName);
+        var data = new byte[stream.Length];
+        stream.ReadExactly(data, 0, data.Length);
+        _coreUiFontMemory = Marshal.AllocCoTaskMem(data.Length);
+        Marshal.Copy(data, 0, _coreUiFontMemory, data.Length);
+        CoreUiFonts.AddMemoryFont(_coreUiFontMemory, data.Length);
+        _coreUiFontFamily = CoreUiFonts.Families[0];
+    }
+private void BuildStatusBar()
+    {
         _statusSelection.TextAlign = ContentAlignment.MiddleLeft;
 
         _statusPointer.TextAlign = ContentAlignment.MiddleRight;

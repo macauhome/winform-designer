@@ -2,6 +2,41 @@
   "version": 4,
   "targets": {
     "net10.0-windows": {
+      "Krypton.Ribbon/105.26.7.201": {
+        "type": "package",
+        "dependencies": {
+          "Krypton.Toolkit": "105.26.7.201"
+        },
+        "compile": {
+          "lib/net10.0-windows7.0/Krypton.Ribbon.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net10.0-windows7.0/Krypton.Ribbon.dll": {
+            "related": ".xml"
+          }
+        },
+        "frameworkReferences": [
+          "Microsoft.WindowsDesktop.App.WindowsForms"
+        ]
+      },
+      "Krypton.Toolkit/105.26.7.201": {
+        "type": "package",
+        "compile": {
+          "lib/net10.0-windows7.0/Krypton.Toolkit.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net10.0-windows7.0/Krypton.Toolkit.dll": {
+            "related": ".xml"
+          }
+        },
+        "frameworkReferences": [
+          "Microsoft.WindowsDesktop.App.WindowsForms"
+        ]
+      },
       "WinFormsDesigner.Core/1.0.0": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v10.0",
@@ -18,6 +53,58 @@
     }
   },
   "libraries": {
+    "Krypton.Ribbon/105.26.7.201": {
+      "sha512": "uJhMEFVuxBWyv4XRLgjdraTeyv7h5HR1afSOEd4lv/rCMDCXKePrwg8mkVZ94vmcx6leRCA8ku7s0RX/EoqxKQ==",
+      "type": "package",
+      "path": "krypton.ribbon/105.26.7.201",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Krypton Stable.png",
+        "License.md",
+        "README.md",
+        "krypton.ribbon.105.26.7.201.nupkg.sha512",
+        "krypton.ribbon.nuspec",
+        "lib/net10.0-windows7.0/Krypton.Ribbon.dll",
+        "lib/net10.0-windows7.0/Krypton.Ribbon.xml",
+        "lib/net472/Krypton.Ribbon.dll",
+        "lib/net472/Krypton.Ribbon.xml",
+        "lib/net48/Krypton.Ribbon.dll",
+        "lib/net48/Krypton.Ribbon.xml",
+        "lib/net481/Krypton.Ribbon.dll",
+        "lib/net481/Krypton.Ribbon.xml",
+        "lib/net8.0-windows7.0/Krypton.Ribbon.dll",
+        "lib/net8.0-windows7.0/Krypton.Ribbon.xml",
+        "lib/net9.0-windows7.0/Krypton.Ribbon.dll",
+        "lib/net9.0-windows7.0/Krypton.Ribbon.xml"
+      ]
+    },
+    "Krypton.Toolkit/105.26.7.201": {
+      "sha512": "Wxr2n7YYR21vtQIsy4csAQhn0v6AcHdD7SX2qOl/Bb/QGpkyUz1a8IxqOWp4VCyaBPUNPNeTNOWfECI7/UrkJw==",
+      "type": "package",
+      "path": "krypton.toolkit/105.26.7.201",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Krypton Stable.png",
+        "License.md",
+        "README.md",
+        "krypton.toolkit.105.26.7.201.nupkg.sha512",
+        "krypton.toolkit.nuspec",
+        "lib/net10.0-windows7.0/Krypton.Toolkit.dll",
+        "lib/net10.0-windows7.0/Krypton.Toolkit.xml",
+        "lib/net472/Krypton.Toolkit.dll",
+        "lib/net472/Krypton.Toolkit.xml",
+        "lib/net48/Krypton.Toolkit.dll",
+        "lib/net48/Krypton.Toolkit.xml",
+        "lib/net481/Krypton.Toolkit.dll",
+        "lib/net481/Krypton.Toolkit.xml",
+        "lib/net8.0-windows7.0/Krypton.Toolkit.dll",
+        "lib/net8.0-windows7.0/Krypton.Toolkit.xml",
+        "lib/net9.0-windows7.0/Krypton.Toolkit.dll",
+        "lib/net9.0-windows7.0/Krypton.Toolkit.xml"
+      ]
+    },
     "WinFormsDesigner.Core/1.0.0": {
       "type": "project",
       "path": "../WinFormsDesigner.Core/WinFormsDesigner.Core.csproj",
@@ -26,6 +113,7 @@
   },
   "projectFileDependencyGroups": {
     "net10.0-windows": [
+      "Krypton.Ribbon >= 105.26.7.201",
       "WinFormsDesigner.Core >= 1.0.0"
     ]
   },
@@ -77,6 +165,12 @@
       "net10.0-windows": {
         "framework": "net10.0-windows7.0",
         "targetAlias": "net10.0-windows",
+        "dependencies": {
+          "Krypton.Ribbon": {
+            "target": "Package",
+            "version": "[105.26.7.201, )"
+          }
+        },
         "imports": [
           "net461",
           "net462",

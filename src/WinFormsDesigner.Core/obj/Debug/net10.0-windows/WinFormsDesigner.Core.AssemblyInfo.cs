@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("WinForms Designer")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+877c50548517ce1a5f41f4e486967da26055ab27")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0b9d8a9094f6ab06e5530204c126ac0d10fd61cd")]
 [assembly: System.Reflection.AssemblyProductAttribute("WinForms Designer")]
 [assembly: System.Reflection.AssemblyTitleAttribute("WinFormsDesigner.Core")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

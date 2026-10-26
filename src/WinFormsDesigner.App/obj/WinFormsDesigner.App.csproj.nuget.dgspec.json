@@ -49,6 +49,12 @@
         "net10.0-windows": {
           "framework": "net10.0-windows7.0",
           "targetAlias": "net10.0-windows",
+          "dependencies": {
+            "Krypton.Ribbon": {
+              "target": "Package",
+              "version": "[105.26.7.201, )"
+            }
+          },
           "imports": [
             "net461",
             "net462",

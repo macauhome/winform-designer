@@ -1,8 +1,11 @@
 {
   "version": 2,
-  "dgSpecHash": "eyTZa9uHSL0=",
+  "dgSpecHash": "LgEx56NnrAA=",
   "success": true,
   "projectFilePath": "D:\\Ken\\Ken\\MyPrograms\\winformdesginer\\src\\WinFormsDesigner.App\\WinFormsDesigner.App.csproj",
-  "expectedPackageFiles": [],
+  "expectedPackageFiles": [
+    "C:\\Users\\macau\\.nuget\\packages\\krypton.ribbon\\105.26.7.201\\krypton.ribbon.105.26.7.201.nupkg.sha512",
+    "C:\\Users\\macau\\.nuget\\packages\\krypton.toolkit\\105.26.7.201\\krypton.toolkit.105.26.7.201.nupkg.sha512"
+  ],
   "logs": []
 }

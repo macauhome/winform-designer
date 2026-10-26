@@ -308,50 +308,126 @@ public sealed class DesignSession
         return true;
     }
 
-    /// <summary>Moves the selected control to the front of the z-order.</summary>
+    /// <summary>Moves the selected control(s) to the front of the z-order.</summary>
     public void BringToFront()
     {
-        if (SelectedNode?.Parent is null)
+        var selected = _selectedNodes.Where(n => n.Parent is not null).ToList();
+        if (selected.Count == 0)
         {
             return;
         }
 
-        var node = SelectedNode;
-        var parent = node.Parent;
-        if (parent.Children.IndexOf(node) == 0)
+        // Group the selected nodes by their parent so each container is handled
+        // independently. Within a container the relative stacking order of the
+        // moved controls is preserved.
+        var groups = selected.GroupBy(n => n.Parent!).ToList();
+        var changed = false;
+
+        foreach (var group in groups)
+        {
+            var parent = group.Key;
+            var selectedInParent = parent.Children.Where(c => group.Contains(c)).ToList();
+            if (selectedInParent.Count == 0)
+            {
+                continue;
+            }
+
+            // Already at the front in the same relative order: nothing to do.
+            var alreadyFront = true;
+            for (var i = 0; i < selectedInParent.Count; i++)
+            {
+                if (parent.Children.IndexOf(selectedInParent[i]) != i)
+                {
+                    alreadyFront = false;
+                    break;
+                }
+            }
+
+            if (alreadyFront)
+            {
+                continue;
+            }
+
+            changed = true;
+            foreach (var node in selectedInParent)
+            {
+                parent.Children.Remove(node);
+            }
+
+            for (var i = selectedInParent.Count - 1; i >= 0; i--)
+            {
+                parent.Children.Insert(0, selectedInParent[i]);
+            }
+        }
+
+        if (!changed)
         {
             return;
         }
 
         PushUndo();
-        parent.Children.Remove(node);
-        parent.Children.Insert(0, node);
         RebuildLiveTree();
-        Select(node);
+        SelectNodes(selected);
         RaiseChanged();
     }
 
-    /// <summary>Moves the selected control to the back of the z-order.</summary>
+    /// <summary>Moves the selected control(s) to the back of the z-order.</summary>
     public void SendToBack()
     {
-        if (SelectedNode?.Parent is null)
+        var selected = _selectedNodes.Where(n => n.Parent is not null).ToList();
+        if (selected.Count == 0)
         {
             return;
         }
 
-        var node = SelectedNode;
-        var parent = node.Parent;
-        var index = parent.Children.IndexOf(node);
-        if (index == parent.Children.Count - 1)
+        var groups = selected.GroupBy(n => n.Parent!).ToList();
+        var changed = false;
+
+        foreach (var group in groups)
+        {
+            var parent = group.Key;
+            var selectedInParent = parent.Children.Where(c => group.Contains(c)).ToList();
+            if (selectedInParent.Count == 0)
+            {
+                continue;
+            }
+
+            var lastIndex = parent.Children.Count - 1;
+            var alreadyBack = true;
+            for (var i = 0; i < selectedInParent.Count; i++)
+            {
+                if (parent.Children.IndexOf(selectedInParent[i]) != lastIndex - selectedInParent.Count + 1 + i)
+                {
+                    alreadyBack = false;
+                    break;
+                }
+            }
+
+            if (alreadyBack)
+            {
+                continue;
+            }
+
+            changed = true;
+            foreach (var node in selectedInParent)
+            {
+                parent.Children.Remove(node);
+            }
+
+            foreach (var node in selectedInParent)
+            {
+                parent.Children.Add(node);
+            }
+        }
+
+        if (!changed)
         {
             return;
         }
 
         PushUndo();
-        parent.Children.Remove(node);
-        parent.Children.Add(node);
         RebuildLiveTree();
-        Select(node);
+        SelectNodes(selected);
         RaiseChanged();
     }
 

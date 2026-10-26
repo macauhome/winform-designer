@@ -1,4 +1,4 @@
-# This project totally AI generate, I just burn some token.
+# This project totally AI generated, I just burn some tokens.
 # WinForms Designer
 
 A standalone Visual Studio style designer for Windows Forms. It runs on .NET 10 as a

@@ -16,6 +16,8 @@ public sealed class DesignerSurface : Panel
     private const int GridSize = 8;
     private const int HandleSize = 7;
 
+    private readonly List<int> _verticalGuides = new();
+    private readonly List<int> _horizontalGuides = new();
     private readonly DesignCanvas _canvas = new();
 
     private DesignSession? _session;
@@ -90,13 +92,28 @@ public sealed class DesignerSurface : Panel
 
     /// <summary>Enables snapping dragged control bounds to the design grid.</summary>
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
-    public bool SnapToGrid { get; set; }
+        private bool _snapToGrid;
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public bool SnapToGrid
+    {
+        get => _snapToGrid;
+        set
+        {
+            if (_snapToGrid == value)
+            {
+                return;
+            }
+
+            _snapToGrid = value;
+            RefreshDesignerVisuals();
+        }
+    }
 
     /// <summary>Shows alignment guides while a control is selected.</summary>
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public bool ShowAlignmentGuides { get; set; } = true;
 
-    private bool _showRuler;
+    private bool _showRuler = true;
     /// <summary>Shows a pixel ruler along the top and left edges of the canvas.</summary>
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public bool ShowRuler
@@ -136,6 +153,11 @@ public sealed class DesignerSurface : Panel
         }
 
         graphics.DrawImageUnscaled(_renderedForm, _formLocation);
+
+        if (SnapToGrid)
+        {
+            PaintGrid(graphics);
+        }
 
         if (ShowRuler)
         {
@@ -182,7 +204,7 @@ public sealed class DesignerSurface : Panel
 
                     if (ShowAlignmentGuides && IsPointerCaptured && _gestureMode == GestureMode.Move)
                     {
-                        PaintAlignmentGuides(graphics, bounds, selectedNode);
+                        PaintAlignmentGuides(graphics);
                     }
                 }
             }
@@ -382,6 +404,8 @@ public sealed class DesignerSurface : Panel
 
         if (_gestureGroup.Count > 0 && _gestureMode == GestureMode.Move)
         {
+            _verticalGuides.Clear();
+            _horizontalGuides.Clear();
             var groupDelta = new Size(canvasPoint.X - _gestureStartPointer.X, canvasPoint.Y - _gestureStartPointer.Y);
             foreach (var groupItem in _gestureGroup)
             {
@@ -407,7 +431,15 @@ public sealed class DesignerSurface : Panel
         if (_gestureMode == GestureMode.Move)
         {
             bounds.Offset(new Point(delta.Width, delta.Height));
-            if (SnapToGrid)
+
+            _verticalGuides.Clear();
+            _horizontalGuides.Clear();
+
+            if (ShowAlignmentGuides && _session is not null && _gestureNode is not null && _gestureNode.Parent is not null)
+            {
+                ApplyAlignmentGuides(bounds, _gestureNode, ref bounds);
+            }
+            else if (SnapToGrid)
             {
                 bounds.X = Snap(bounds.X);
                 bounds.Y = Snap(bounds.Y);
@@ -505,7 +537,14 @@ public sealed class DesignerSurface : Panel
         var dirtyBounds = Rectangle.Union(oldCanvasBounds, newCanvasBounds);
         dirtyBounds.Inflate(HandleSize + 2, HandleSize + 2);
         InvalidateRenderedForm();
-        _canvas.Invalidate(dirtyBounds);
+        if (_gestureMode == GestureMode.Move && ShowAlignmentGuides && _gestureNode?.Parent is not null)
+        {
+            _canvas.Invalidate();
+        }
+        else
+        {
+            _canvas.Invalidate(dirtyBounds);
+        }
     }
 
     private void EndGesture(Point canvasPoint, bool commit)
@@ -527,6 +566,8 @@ public sealed class DesignerSurface : Panel
         var originalBounds = _gestureStartBounds;
 
         _gestureMode = GestureMode.None;
+        _verticalGuides.Clear();
+        _horizontalGuides.Clear();
         _gestureNode = null;
         _gestureControl = null;
         _resizeEdges = ResizeEdges.None;
@@ -654,6 +695,8 @@ public sealed class DesignerSurface : Panel
             {
                 return edges[index];
             }
+
+
         }
 
         return ResizeEdges.None;
@@ -729,33 +772,174 @@ public sealed class DesignerSurface : Panel
     }
 
 
-    private void PaintAlignmentGuides(Graphics graphics, Rectangle selectedBounds, DesignNode selected)
+    private void ApplyAlignmentGuides(Rectangle currentBounds, DesignNode selected, ref Rectangle bounds)
     {
         if (_session is null || selected.Parent is null)
         {
             return;
         }
 
-        using var pen = new Pen(Color.FromArgb(180, Color.DarkOrange), 1) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dot };
+        const int threshold = 6;
+
+        var parentLive = _session.GetLive(selected.Parent);
+        var parentOrigin = parentLive is null ? Point.Empty : ControlBoundsOnCanvas(parentLive).Location;
+
+        var guideCandidatesX = new List<int>();
+        var guideCandidatesY = new List<int>();
+
         foreach (var sibling in selected.Parent.Children)
         {
-            if (ReferenceEquals(sibling, selected) || _session.GetLive(sibling) is not { } control)
+            if (ReferenceEquals(sibling, selected))
             {
                 continue;
             }
 
-            var siblingBounds = ControlBoundsOnCanvas(control);
-            if (selectedBounds.Left == siblingBounds.Left || selectedBounds.Right == siblingBounds.Right)
+            if (_session.GetLive(sibling) is not { } siblingControl)
             {
-                graphics.DrawLine(pen, siblingBounds.Left, 0, siblingBounds.Left, _canvas.Height);
+                continue;
             }
 
-            if (selectedBounds.Top == siblingBounds.Top || selectedBounds.Bottom == siblingBounds.Bottom)
+            var siblingBounds = ControlBoundsOnCanvas(siblingControl);
+            siblingBounds.Offset(-parentOrigin.X, -parentOrigin.Y);
+            guideCandidatesX.Add(siblingBounds.Left);
+            guideCandidatesX.Add(siblingBounds.Right);
+            guideCandidatesX.Add((siblingBounds.Left + siblingBounds.Right) / 2);
+            guideCandidatesY.Add(siblingBounds.Top);
+            guideCandidatesY.Add(siblingBounds.Bottom);
+            guideCandidatesY.Add((siblingBounds.Top + siblingBounds.Bottom) / 2);
+        }
+
+        if (selected.Parent == _session.Document.Root)
+        {
+            var formBounds = new Rectangle(Point.Empty, _session.RootForm.Size);
+            guideCandidatesX.Add(formBounds.Left);
+            guideCandidatesX.Add(formBounds.Right);
+            guideCandidatesX.Add((formBounds.Left + formBounds.Right) / 2);
+            guideCandidatesY.Add(formBounds.Top);
+            guideCandidatesY.Add(formBounds.Bottom);
+            guideCandidatesY.Add((formBounds.Top + formBounds.Bottom) / 2);
+        }
+
+        // X axis
+        {
+            int bestDiff = threshold + 1;
+            int guide = currentBounds.Left;
+            int newX = currentBounds.Left;
+
+            foreach (var candidate in guideCandidatesX)
             {
-                graphics.DrawLine(pen, 0, siblingBounds.Top, _canvas.Width, siblingBounds.Top);
+                var diffLeft = Math.Abs(candidate - currentBounds.Left);
+                if (diffLeft < bestDiff)
+                {
+                    bestDiff = diffLeft;
+                    guide = candidate;
+                    newX = candidate;
+                }
+
+                var diffRight = Math.Abs(candidate - currentBounds.Right);
+                if (diffRight < bestDiff)
+                {
+                    bestDiff = diffRight;
+                    guide = candidate;
+                    newX = candidate - currentBounds.Width;
+                }
+
+                var center = currentBounds.Left + (currentBounds.Width / 2);
+                var diffCenter = Math.Abs(candidate - center);
+                if (diffCenter < bestDiff)
+                {
+                    bestDiff = diffCenter;
+                    guide = candidate;
+                    newX = candidate - (currentBounds.Width / 2);
+                }
+            }
+
+            if (bestDiff <= threshold)
+            {
+                bounds.X = newX;
+                _verticalGuides.Add(guide + parentOrigin.X);
+            }
+            else if (SnapToGrid)
+            {
+                bounds.X = Snap(bounds.X);
+            }
+        }
+
+        // Y axis
+        {
+            int bestDiff = threshold + 1;
+            int guide = currentBounds.Top;
+            int newY = currentBounds.Top;
+
+            foreach (var candidate in guideCandidatesY)
+            {
+                var diffTop = Math.Abs(candidate - currentBounds.Top);
+                if (diffTop < bestDiff)
+                {
+                    bestDiff = diffTop;
+                    guide = candidate;
+                    newY = candidate;
+                }
+
+                var diffBottom = Math.Abs(candidate - currentBounds.Bottom);
+                if (diffBottom < bestDiff)
+                {
+                    bestDiff = diffBottom;
+                    guide = candidate;
+                    newY = candidate - currentBounds.Height;
+                }
+
+                var center = currentBounds.Top + (currentBounds.Height / 2);
+                var diffCenter = Math.Abs(candidate - center);
+                if (diffCenter < bestDiff)
+                {
+                    bestDiff = diffCenter;
+                    guide = candidate;
+                    newY = candidate - (currentBounds.Height / 2);
+                }
+            }
+
+            if (bestDiff <= threshold)
+            {
+                bounds.Y = newY;
+                _horizontalGuides.Add(guide + parentOrigin.Y);
+            }
+            else if (SnapToGrid)
+            {
+                bounds.Y = Snap(bounds.Y);
             }
         }
     }
+
+
+    private void PaintAlignmentGuides(Graphics graphics)
+    {
+        using var pen = new Pen(Color.FromArgb(180, Color.DarkOrange), 1) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dot };
+        foreach (var x in _verticalGuides)
+        {
+            graphics.DrawLine(pen, x, 0, x, _canvas.Height);
+        }
+
+        foreach (var y in _horizontalGuides)
+        {
+            graphics.DrawLine(pen, 0, y, _canvas.Width, y);
+        }
+    }
+
+    private void PaintGrid(Graphics graphics)
+    {
+        using var brush = new SolidBrush(Color.FromArgb(45, 128, 128, 128));
+        var width = _canvas.Width;
+        var height = _canvas.Height;
+        for (var x = 0; x < width; x += GridSize)
+        {
+            for (var y = 0; y < height; y += GridSize)
+            {
+                graphics.FillRectangle(brush, x, y, 1, 1);
+            }
+        }
+    }
+
 
     private void ResizeCanvas()
     {

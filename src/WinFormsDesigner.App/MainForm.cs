@@ -167,6 +167,7 @@ public sealed class MainForm : Form
         _showToolbox.Checked = true;
         _showProperties.Checked = true;
         _showGuides.Checked = true;
+        _showRuler.Checked = true;
 
         var file = new ToolStripMenuItem("&File");
         file.DropDownItems.Add(Item("&New Form", Keys.Control | Keys.N, (_, _) => NewDocument()));
@@ -280,14 +281,19 @@ public sealed class MainForm : Form
         var viewGroup = new KryptonRibbonGroup { TextLine1 = "View" };
         var viewLines = new KryptonRibbonGroupLines();
         _ribbonToolbox = AddRibbonButton(viewLines, "Toolbox", IconToolbox, ToggleToolbox);
+        SetRibbonToggleIcon(_ribbonToolbox, IconToolbox, _showToolbox.Checked);
         _ribbonToolbox.Checked = _showToolbox.Checked;
         _ribbonProps = AddRibbonButton(viewLines, "Props", IconProps, ToggleProperties);
+        SetRibbonToggleIcon(_ribbonProps, IconProps, _showProperties.Checked);
         _ribbonProps.Checked = _showProperties.Checked;
         _ribbonSnap = AddRibbonButton(viewLines, "Snap", IconSnap, ToggleSnapToGrid);
+        SetRibbonToggleIcon(_ribbonSnap, IconSnap, _snapToGrid.Checked);
         _ribbonSnap.Checked = _snapToGrid.Checked;
         _ribbonGuides = AddRibbonButton(viewLines, "Guides", IconGuides, ToggleGuides);
+        SetRibbonToggleIcon(_ribbonGuides, IconGuides, _showGuides.Checked);
         _ribbonGuides.Checked = _showGuides.Checked;
         _ribbonRuler = AddRibbonButton(viewLines, "Ruler", IconGuides, ToggleRuler);
+        SetRibbonToggleIcon(_ribbonRuler, IconGuides, _showRuler.Checked);
         _ribbonRuler.Checked = _showRuler.Checked;
         viewGroup.Items.Add(viewLines);
         home.Groups.Add(viewGroup);
@@ -310,17 +316,23 @@ public sealed class MainForm : Form
         return button;
     }
 
-    private static Image CreateRibbonIcon(string glyph, int size)
+    private static void SetRibbonToggleIcon(KryptonRibbonGroupButton button, char glyph, bool active)
     {
-    EnsureCoreUiFont();
-    var bmp = new Bitmap(size, size);
+        var color = active ? Color.RoyalBlue : Color.Black;
+        button.ImageLarge = CreateRibbonIcon(glyph.ToString(), 32, color);
+        button.ImageSmall = CreateRibbonIcon(glyph.ToString(), 16, color);
+    }
+    private static Image CreateRibbonIcon(string glyph, int size, Color? color = null)
+    {
+        EnsureCoreUiFont();
+        var bmp = new Bitmap(size, size);
         using var g = Graphics.FromImage(bmp);
         g.Clear(Color.Transparent);
         g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
         g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
         using var font = new Font(_coreUiFontFamily!, size * 0.7f, FontStyle.Regular, GraphicsUnit.Pixel);
         var measured = g.MeasureString(glyph, font);
-        using var brush = new SolidBrush(Color.Black);
+        using var brush = new SolidBrush(color ?? Color.Black);
         g.DrawString(glyph, font, brush, (size - measured.Width) / 2f, (size - measured.Height) / 2f);
         return bmp;
     }
@@ -496,6 +508,7 @@ private void BuildStatusBar()
         _snapToGrid.Checked = !_snapToGrid.Checked;
         _surface.SnapToGrid = _snapToGrid.Checked;
         _ribbonSnap.Checked = _snapToGrid.Checked;
+        SetRibbonToggleIcon(_ribbonSnap, IconSnap, _snapToGrid.Checked);
     }
 
     private void ToggleGuides()
@@ -503,6 +516,7 @@ private void BuildStatusBar()
         _showGuides.Checked = !_showGuides.Checked;
         _surface.ShowAlignmentGuides = _showGuides.Checked;
         _ribbonGuides.Checked = _showGuides.Checked;
+        SetRibbonToggleIcon(_ribbonGuides, IconGuides, _showGuides.Checked);
     }
 
     private void ToggleRuler()
@@ -510,6 +524,7 @@ private void BuildStatusBar()
         _showRuler.Checked = !_showRuler.Checked;
         _surface.ShowRuler = _showRuler.Checked;
         _ribbonRuler.Checked = _showRuler.Checked;
+        SetRibbonToggleIcon(_ribbonRuler, IconGuides, _showRuler.Checked);
     }
 
     private void ToggleToolbox()
@@ -517,6 +532,7 @@ private void BuildStatusBar()
         _showToolbox.Checked = !_showToolbox.Checked;
         _shell.ShowToolbox = _showToolbox.Checked;
         _ribbonToolbox.Checked = _showToolbox.Checked;
+        SetRibbonToggleIcon(_ribbonToolbox, IconToolbox, _showToolbox.Checked);
     }
 
     private void ToggleProperties()
@@ -524,6 +540,7 @@ private void BuildStatusBar()
         _showProperties.Checked = !_showProperties.Checked;
         _shell.ShowProperties = _showProperties.Checked;
         _ribbonProps.Checked = _showProperties.Checked;
+        SetRibbonToggleIcon(_ribbonProps, IconProps, _showProperties.Checked);
     }
 
     private void OnControlRequested(object? sender, ToolboxEntryEventArgs e)

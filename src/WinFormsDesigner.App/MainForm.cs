@@ -198,8 +198,8 @@ public sealed class MainForm : Form
         view.DropDownItems.Add(_showRuler);
 
         var format = new ToolStripMenuItem("F&ormat");
-        format.DropDownItems.Add(Item("Bring to &Front", Keys.Control | Keys.Oem6, (_, _) => BringSelectionToFront()));
-        format.DropDownItems.Add(Item("Send to &Back", Keys.Control | Keys.Oem4, (_, _) => SendSelectionToBack()));
+        format.DropDownItems.Add(Item("Bring to &Front", Keys.Control | Keys.Oem6, (_, _) => SendSelectionToBack()));
+        format.DropDownItems.Add(Item("Send to &Back", Keys.Control | Keys.Oem4, (_, _) => BringSelectionToFront()));
         format.DropDownItems.Add(new ToolStripSeparator());
         format.DropDownItems.Add(Item("&Align Left", Keys.Control | Keys.Alt | Keys.Left, (_, _) => Align(DesignerAlign.Left)));
         format.DropDownItems.Add(Item("&Center Horizontally", Keys.Control | Keys.Alt | Keys.D, (_, _) => Align(DesignerAlign.CenterHorizontal)));
@@ -273,8 +273,8 @@ public sealed class MainForm : Form
 
         var arrangeGroup = new KryptonRibbonGroup { TextLine1 = "Arrange" };
         var arrangeLines = new KryptonRibbonGroupLines();
-        AddRibbonButton(arrangeLines, "Front", IconFront, BringSelectionToFront);
-        AddRibbonButton(arrangeLines, "Back", IconBack, SendSelectionToBack);
+        AddRibbonButton(arrangeLines, "Front", IconFront, SendSelectionToBack);
+        AddRibbonButton(arrangeLines, "Back", IconBack, BringSelectionToFront);
         arrangeGroup.Items.Add(arrangeLines);
         home.Groups.Add(arrangeGroup);
 

@@ -6,7 +6,7 @@ self contained desktop application and needs **no Visual Studio and no design ti
 assemblies** — the toolbox, the property grid and the code generator are all implemented
 from scratch.
 
-![Designer](docs/screenshot.png)
+![Designer](docs/screenshot.jpg)
 
 ## What it does
 

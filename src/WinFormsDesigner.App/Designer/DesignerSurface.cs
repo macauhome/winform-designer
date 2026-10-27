@@ -15,6 +15,9 @@ public sealed class DesignerSurface : Panel
     private const int CanvasMargin = 24;
     private const int GridSize = 8;
     private const int HandleSize = 7;
+    private const int ComponentTrayGap = 12;
+    private const int ComponentItemHeight = 22;
+    private const int ComponentIconSize = 16;
 
     private readonly List<int> _verticalGuides = new();
     private readonly List<int> _horizontalGuides = new();
@@ -153,6 +156,8 @@ public sealed class DesignerSurface : Panel
         }
 
         graphics.DrawImageUnscaled(_renderedForm, _formLocation);
+
+        PaintComponentTray(graphics);
 
         if (SnapToGrid)
         {
@@ -315,6 +320,26 @@ public sealed class DesignerSurface : Panel
         }
 
         var formPoint = new Point(canvasPoint.X - _formLocation.X, canvasPoint.Y - _formLocation.Y);
+
+        // Select non-visual components from the component tray.
+        foreach (var (componentNode, componentBounds) in GetComponentItems())
+        {
+            if (!componentBounds.Contains(canvasPoint))
+            {
+                continue;
+            }
+
+            if (shiftPressed)
+            {
+                _session.ToggleSelection(componentNode);
+            }
+            else if (!_session.SelectedNodes.Contains(componentNode))
+            {
+                _session.Select(componentNode);
+            }
+
+            return;
+        }
         var hit = _session.HitTest(formPoint);
         if (hit is null && _session.RootForm.ClientRectangle.Contains(formPoint))
         {
@@ -634,6 +659,13 @@ public sealed class DesignerSurface : Panel
 
     private Cursor CursorAt(Point surfacePoint)
     {
+        foreach (var (_, bounds) in GetComponentItems())
+        {
+            if (bounds.Contains(surfacePoint))
+            {
+                return Cursors.Default;
+            }
+        }
         if (_session?.SelectedNode is { } selected && _session.GetLive(selected) is { } control)
         {
             var edges = GetResizeEdges(ControlBoundsOnCanvas(control), surfacePoint);
@@ -726,6 +758,104 @@ public sealed class DesignerSurface : Panel
         }
 
         return new Rectangle(x, y, control.Width, control.Height);
+    }
+
+    private List<(DesignNode Node, Rectangle Bounds)> GetComponentItems()
+    {
+        var result = new List<(DesignNode, Rectangle)>();
+        if (_session is null)
+        {
+            return result;
+        }
+
+        var components = _session.Document.AllNodes()
+            .Where(node => ControlFactory.IsComponent(node.ControlType))
+            .ToList();
+        if (components.Count == 0)
+        {
+            return result;
+        }
+
+        var root = _session.RootForm;
+        var font = new Font(SystemFonts.DefaultFont.FontFamily, 8f);
+        int x = _formLocation.X;
+        int y = _formLocation.Y + root.Height + ComponentTrayGap;
+        int maxX = _formLocation.X + Math.Max(root.Width, 160);
+
+        foreach (var node in components)
+        {
+            var text = node.Name;
+            int textWidth = TextRenderer.MeasureText(text, font).Width;
+            int width = ComponentIconSize + 4 + textWidth + 10;
+            if (width < 72)
+            {
+                width = 72;
+            }
+
+            if (x + width > maxX && x > _formLocation.X)
+            {
+                x = _formLocation.X;
+                y += ComponentItemHeight;
+            }
+
+            result.Add((node, new Rectangle(x, y, width, ComponentItemHeight)));
+            x += width + 6;
+        }
+
+        font.Dispose();
+        return result;
+    }
+
+    private int GetComponentTrayHeight()
+    {
+        var items = GetComponentItems();
+        if (items.Count == 0)
+        {
+            return 0;
+        }
+
+        int top = items.Min(item => item.Bounds.Top);
+        int bottom = items.Max(item => item.Bounds.Bottom);
+        return bottom - top + ComponentTrayGap;
+    }
+
+    private void PaintComponentTray(Graphics graphics)
+    {
+        var items = GetComponentItems();
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        using var trayBrush = new SolidBrush(Color.FromArgb(245, 245, 245));
+        using var borderPen = new Pen(Color.FromArgb(200, 200, 200));
+        using var textBrush = new SolidBrush(Color.FromArgb(30, 30, 30));
+        using var font = new Font(SystemFonts.DefaultFont.FontFamily, 8f);
+        using var selectionPen = new Pen(Color.RoyalBlue, 1) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
+
+        int top = items.Min(item => item.Bounds.Top) - 4;
+        int bottom = items.Max(item => item.Bounds.Bottom) + 4;
+        int left = _formLocation.X;
+        int right = Math.Max(items.Max(item => item.Bounds.Right), _formLocation.X + (_session?.RootForm.Width ?? 0));
+        var trayRect = new Rectangle(left - 4, top, right - left + 8, bottom - top);
+        graphics.FillRectangle(trayBrush, trayRect);
+        graphics.DrawRectangle(borderPen, trayRect);
+
+        foreach (var (node, bounds) in items)
+        {
+            var entry = ControlTypeRegistry.Find(node.ControlType);
+            var glyphKey = entry?.Glyph ?? node.ControlType.Name.ToLowerInvariant();
+            var icon = GlyphFactory.GetGlyph(glyphKey);
+            graphics.DrawImage(icon, bounds.X, bounds.Y + (bounds.Height - ComponentIconSize) / 2);
+
+            var textRect = new Rectangle(bounds.X + ComponentIconSize + 4, bounds.Y, bounds.Width - ComponentIconSize - 4, bounds.Height);
+            TextRenderer.DrawText(graphics, node.Name, font, textRect, textBrush.Color, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+
+            if (_session is not null && _session.SelectedNodes.Contains(node))
+            {
+                graphics.DrawRectangle(selectionPen, bounds);
+            }
+        }
     }
 
     private int Snap(int value)
@@ -944,8 +1074,9 @@ public sealed class DesignerSurface : Panel
     private void ResizeCanvas()
     {
         var root = _session?.RootForm;
+        var trayHeight = GetComponentTrayHeight();
         var width = Math.Max(ClientSize.Width, _formLocation.X + (root?.Width ?? 0) + CanvasMargin);
-        var height = Math.Max(ClientSize.Height, _formLocation.Y + (root?.Height ?? 0) + CanvasMargin);
+        var height = Math.Max(ClientSize.Height, _formLocation.Y + (root?.Height ?? 0) + trayHeight + ComponentTrayGap + CanvasMargin);
         _canvas.Size = new Size(Math.Max(1, width), Math.Max(1, height));
         AutoScrollMinSize = _canvas.Size;
         RefreshDesignerVisuals();

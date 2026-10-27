@@ -18,7 +18,7 @@ namespace WinFormsDesigner.App;
 /// The main window of the designer. It arranges the toolbox, the design surface and the
 /// property grid the way the Visual Studio designer does and hosts the editing commands.
 /// </summary>
-public sealed class MainForm : Form, IMessageFilter
+public sealed class MainForm : KryptonForm
 {
     private const int ToolboxWidth = 230;
     private const int PropertiesWidth = 330;
@@ -90,7 +90,6 @@ public sealed class MainForm : Form, IMessageFilter
         BuildRibbon();
         BuildStatusBar();
 
-        Application.AddMessageFilter(this);
         AttachSession(_session);
 
         _surface.Session = _session;
@@ -179,7 +178,8 @@ public sealed class MainForm : Form, IMessageFilter
         file.DropDownItems.Add(Item("Save &As...", Keys.Control | Keys.Shift | Keys.S, (_, _) => GenerateCode()));
         file.DropDownItems.Add(Item("&Generate Code...", Keys.Control | Keys.G, (_, _) => GenerateCode()));
         file.DropDownItems.Add(new ToolStripSeparator());
-        file.DropDownItems.Add(Item("Exit", Keys.None, (_, _) => Close()));
+        //file.DropDownItems.Add(Item("Exit", Keys.None, (_, _) => Close()));
+        file.DropDownItems.Add(Item("Exit", Keys.Alt | Keys.F4, (_, _) => Close()));
 
         var edit = new ToolStripMenuItem("&Edit");
         edit.DropDownItems.Add(Item("&Undo", Keys.Control | Keys.Z, (_, _) => Undo()));
@@ -714,11 +714,6 @@ private void BuildStatusBar()
         }
     }
 
-    public bool PreFilterMessage(ref Message m)
-    {
-        return false;
-    }
-
     protected override void WndProc(ref Message m)
     {
         const int WM_CLOSE = 0x0010;
@@ -727,38 +722,23 @@ private void BuildStatusBar()
         const int WM_KEYUP = 0x0101;
         const int VK_LMENU = 0xA4;
 
-        if (m.Msg == WM_SYSKEYDOWN)
+        if (m.Msg == WM_SYSKEYDOWN && (m.WParam.ToInt32() & 0xFFFF) == VK_LMENU)
         {
-            int vk = m.WParam.ToInt32() & 0xFFFF;
-            if (vk == VK_LMENU)
-            {
-                _leftAltPressed = true;
-                var t = new System.Windows.Forms.Timer { Interval = 1000 };
-                t.Tick += (_, _) => { _leftAltPressed = false; t.Stop(); t.Dispose(); };
-                t.Start();
-            }
+            _leftAltPressed = true;
         }
-        if (m.Msg == WM_SYSKEYUP || m.Msg == WM_KEYUP)
+        if ((m.Msg == WM_SYSKEYUP || m.Msg == WM_KEYUP) && (m.WParam.ToInt32() & 0xFFFF) == VK_LMENU)
         {
-            int vk = m.WParam.ToInt32() & 0xFFFF;
-            if (vk == VK_LMENU) _leftAltPressed = false;
+            _leftAltPressed = false;
         }
-
         if (m.Msg == WM_CLOSE && _leftAltPressed)
         {
             _leftAltPressed = false;
             return;
         }
-
-        if (m.Msg == WM_SYSKEYDOWN)
+        if (m.Msg == WM_SYSKEYDOWN && (m.WParam.ToInt32() & 0xFFFF) == VK_LMENU)
         {
-            int vk = m.WParam.ToInt32() & 0xFFFF;
-            if (vk == VK_LMENU)
-            {
-                return;
-            }
+            return;
         }
-
         base.WndProc(ref m);
     }
 

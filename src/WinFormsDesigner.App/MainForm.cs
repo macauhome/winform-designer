@@ -18,7 +18,7 @@ namespace WinFormsDesigner.App;
 /// The main window of the designer. It arranges the toolbox, the design surface and the
 /// property grid the way the Visual Studio designer does and hosts the editing commands.
 /// </summary>
-public sealed class MainForm : Form
+public sealed class MainForm : Form, IMessageFilter
 {
     private const int ToolboxWidth = 230;
     private const int PropertiesWidth = 330;
@@ -30,6 +30,8 @@ public sealed class MainForm : Form
     private static readonly PrivateFontCollection CoreUiFonts = new();
     private static IntPtr _coreUiFontMemory = IntPtr.Zero;
     private static FontFamily? _coreUiFontFamily;
+
+    private bool _leftAltPressed;
 
     private const char IconNew = '\uF1A1';
     private const char IconOpen = '\uF24D';
@@ -88,6 +90,7 @@ public sealed class MainForm : Form
         BuildRibbon();
         BuildStatusBar();
 
+        Application.AddMessageFilter(this);
         AttachSession(_session);
 
         _surface.Session = _session;
@@ -176,7 +179,7 @@ public sealed class MainForm : Form
         file.DropDownItems.Add(Item("Save &As...", Keys.Control | Keys.Shift | Keys.S, (_, _) => GenerateCode()));
         file.DropDownItems.Add(Item("&Generate Code...", Keys.Control | Keys.G, (_, _) => GenerateCode()));
         file.DropDownItems.Add(new ToolStripSeparator());
-        file.DropDownItems.Add(Item("E&xit", Keys.Alt | Keys.F4, (_, _) => Close()));
+        file.DropDownItems.Add(Item("Exit", Keys.None, (_, _) => Close()));
 
         var edit = new ToolStripMenuItem("&Edit");
         edit.DropDownItems.Add(Item("&Undo", Keys.Control | Keys.Z, (_, _) => Undo()));
@@ -198,8 +201,8 @@ public sealed class MainForm : Form
         view.DropDownItems.Add(_showRuler);
 
         var format = new ToolStripMenuItem("F&ormat");
-        format.DropDownItems.Add(Item("Bring to &Front", Keys.Control | Keys.Oem6, (_, _) => SendSelectionToBack()));
-        format.DropDownItems.Add(Item("Send to &Back", Keys.Control | Keys.Oem4, (_, _) => BringSelectionToFront()));
+        format.DropDownItems.Add(Item("Bring to &Front", Keys.Control | Keys.Oem6, (_, _) => BringSelectionToFront()));
+        format.DropDownItems.Add(Item("Send to &Back", Keys.Control | Keys.Oem4, (_, _) => SendSelectionToBack()));
         format.DropDownItems.Add(new ToolStripSeparator());
         format.DropDownItems.Add(Item("&Align Left", Keys.Control | Keys.Alt | Keys.Left, (_, _) => Align(DesignerAlign.Left)));
         format.DropDownItems.Add(Item("&Center Horizontally", Keys.Control | Keys.Alt | Keys.D, (_, _) => Align(DesignerAlign.CenterHorizontal)));
@@ -273,8 +276,8 @@ public sealed class MainForm : Form
 
         var arrangeGroup = new KryptonRibbonGroup { TextLine1 = "Arrange" };
         var arrangeLines = new KryptonRibbonGroupLines();
-        AddRibbonButton(arrangeLines, "Front", IconFront, SendSelectionToBack);
-        AddRibbonButton(arrangeLines, "Back", IconBack, BringSelectionToFront);
+        AddRibbonButton(arrangeLines, "Front", IconFront, BringSelectionToFront);
+        AddRibbonButton(arrangeLines, "Back", IconBack, SendSelectionToBack);
         arrangeGroup.Items.Add(arrangeLines);
         home.Groups.Add(arrangeGroup);
 
@@ -709,6 +712,54 @@ private void BuildStatusBar()
         {
             _statusSelection.Text = $"{node.ControlType.Name}  ({node.Name}){size}";
         }
+    }
+
+    public bool PreFilterMessage(ref Message m)
+    {
+        return false;
+    }
+
+    protected override void WndProc(ref Message m)
+    {
+        const int WM_CLOSE = 0x0010;
+        const int WM_SYSKEYDOWN = 0x0104;
+        const int WM_SYSKEYUP = 0x0105;
+        const int WM_KEYUP = 0x0101;
+        const int VK_LMENU = 0xA4;
+
+        if (m.Msg == WM_SYSKEYDOWN)
+        {
+            int vk = m.WParam.ToInt32() & 0xFFFF;
+            if (vk == VK_LMENU)
+            {
+                _leftAltPressed = true;
+                var t = new System.Windows.Forms.Timer { Interval = 1000 };
+                t.Tick += (_, _) => { _leftAltPressed = false; t.Stop(); t.Dispose(); };
+                t.Start();
+            }
+        }
+        if (m.Msg == WM_SYSKEYUP || m.Msg == WM_KEYUP)
+        {
+            int vk = m.WParam.ToInt32() & 0xFFFF;
+            if (vk == VK_LMENU) _leftAltPressed = false;
+        }
+
+        if (m.Msg == WM_CLOSE && _leftAltPressed)
+        {
+            _leftAltPressed = false;
+            return;
+        }
+
+        if (m.Msg == WM_SYSKEYDOWN)
+        {
+            int vk = m.WParam.ToInt32() & 0xFFFF;
+            if (vk == VK_LMENU)
+            {
+                return;
+            }
+        }
+
+        base.WndProc(ref m);
     }
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)

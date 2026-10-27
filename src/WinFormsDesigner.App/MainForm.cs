@@ -25,13 +25,12 @@ public sealed class MainForm : KryptonForm
 
     private readonly MenuStrip _menu = new();
     private readonly KryptonRibbon _ribbon = new();
+    private readonly Panel _ribbonHost = new() { Dock = DockStyle.None };
 
     // CoreUI free icon font (embedded resource).
     private static readonly PrivateFontCollection CoreUiFonts = new();
     private static IntPtr _coreUiFontMemory = IntPtr.Zero;
     private static FontFamily? _coreUiFontFamily;
-
-    private bool _leftAltPressed;
 
     private const char IconNew = '\uF1A1';
     private const char IconOpen = '\uF24D';
@@ -116,16 +115,46 @@ public sealed class MainForm : KryptonForm
         _shell.ToolboxWidth = ToolboxWidth;
         _shell.PropertiesWidth = PropertiesWidth;
 
-        _menu.Dock = DockStyle.Top;
-        _ribbon.Dock = DockStyle.Top;
-        _status.Dock = DockStyle.Bottom;
+        _shell.Dock = DockStyle.None;
+        _menu.Dock = DockStyle.None;
+        _ribbon.Dock = DockStyle.Fill;
+        _status.Dock = DockStyle.None;
 
-        // The docking order runs from the last added control to the first one, so the
-        // status bar claims the bottom, the menu the top and the toolbar sits below it.
+        _ribbonHost.Controls.Add(_ribbon);
+
         Controls.Add(_shell);
-        Controls.Add(_ribbon);
         Controls.Add(_menu);
+        Controls.Add(_ribbonHost);
         Controls.Add(_status);
+
+        Resize += (_, _) => LayoutChrome();
+        LayoutChrome();
+    }
+
+    private void LayoutChrome()
+    {
+        var width = ClientSize.Width;
+        if (width <= 0)
+        {
+            return;
+        }
+
+        _menu.Location = new Point(0, 0);
+        _menu.Width = width;
+
+        var ribbonHeight = _ribbon.GetPreferredSize(new Size(width, 0)).Height;
+        if (ribbonHeight <= 0)
+        {
+            ribbonHeight = _ribbon.Height > 0 ? _ribbon.Height : 150;
+        }
+        _ribbonHost.Location = new Point(0, _menu.Bottom);
+        _ribbonHost.Size = new Size(width, ribbonHeight);
+
+        _status.Location = new Point(0, ClientSize.Height - _status.Height);
+        _status.Width = width;
+
+        _shell.Location = new Point(0, _ribbonHost.Bottom);
+        _shell.Size = new Size(width, Math.Max(0, _status.Top - _ribbonHost.Bottom));
     }
 
     private static Panel CreatePanelHeader(string caption, Control content)
@@ -201,8 +230,8 @@ public sealed class MainForm : KryptonForm
         view.DropDownItems.Add(_showRuler);
 
         var format = new ToolStripMenuItem("F&ormat");
-        format.DropDownItems.Add(Item("Bring to &Front", Keys.Control | Keys.Oem6, (_, _) => BringSelectionToFront()));
-        format.DropDownItems.Add(Item("Send to &Back", Keys.Control | Keys.Oem4, (_, _) => SendSelectionToBack()));
+        format.DropDownItems.Add(Item("Bring to &Back", Keys.Control | Keys.B, (_, _) => BringSelectionToFront()));
+        format.DropDownItems.Add(Item("Send to &Font", Keys.Control | Keys.F, (_, _) => SendSelectionToBack()));
         format.DropDownItems.Add(new ToolStripSeparator());
         format.DropDownItems.Add(Item("&Align Left", Keys.Control | Keys.Alt | Keys.Left, (_, _) => Align(DesignerAlign.Left)));
         format.DropDownItems.Add(Item("&Center Horizontally", Keys.Control | Keys.Alt | Keys.D, (_, _) => Align(DesignerAlign.CenterHorizontal)));
@@ -276,8 +305,8 @@ public sealed class MainForm : KryptonForm
 
         var arrangeGroup = new KryptonRibbonGroup { TextLine1 = "Arrange" };
         var arrangeLines = new KryptonRibbonGroupLines();
-        AddRibbonButton(arrangeLines, "Front", IconFront, BringSelectionToFront);
-        AddRibbonButton(arrangeLines, "Back", IconBack, SendSelectionToBack);
+        AddRibbonButton(arrangeLines, "Back", IconBack, BringSelectionToFront);
+        AddRibbonButton(arrangeLines, "Front", IconFront, SendSelectionToBack);
         arrangeGroup.Items.Add(arrangeLines);
         home.Groups.Add(arrangeGroup);
 
@@ -714,33 +743,6 @@ private void BuildStatusBar()
         }
     }
 
-    protected override void WndProc(ref Message m)
-    {
-        const int WM_CLOSE = 0x0010;
-        const int WM_SYSKEYDOWN = 0x0104;
-        const int WM_SYSKEYUP = 0x0105;
-        const int WM_KEYUP = 0x0101;
-        const int VK_LMENU = 0xA4;
-
-        if (m.Msg == WM_SYSKEYDOWN && (m.WParam.ToInt32() & 0xFFFF) == VK_LMENU)
-        {
-            _leftAltPressed = true;
-        }
-        if ((m.Msg == WM_SYSKEYUP || m.Msg == WM_KEYUP) && (m.WParam.ToInt32() & 0xFFFF) == VK_LMENU)
-        {
-            _leftAltPressed = false;
-        }
-        if (m.Msg == WM_CLOSE && _leftAltPressed)
-        {
-            _leftAltPressed = false;
-            return;
-        }
-        if (m.Msg == WM_SYSKEYDOWN && (m.WParam.ToInt32() & 0xFFFF) == VK_LMENU)
-        {
-            return;
-        }
-        base.WndProc(ref m);
-    }
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {

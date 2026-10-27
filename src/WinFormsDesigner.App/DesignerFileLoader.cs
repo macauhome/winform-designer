@@ -9,10 +9,10 @@ namespace WinFormsDesigner.App;
 /// Loads an existing Visual Studio style <c>.designer.cs</c> file into a
 /// <see cref="DesignDocument"/> so it can be edited in the designer.
 /// </summary>
-public static class DesignerFileLoader
+public static partial class DesignerFileLoader
 {
     private static readonly Regex NamespaceRegex = new(@"^\s*namespace\s+([^\s{;]+)", RegexOptions.Compiled | RegexOptions.Multiline);
-    private static readonly Regex ClassRegex = new(@"partial\s+class\s+([A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
+    private static readonly Regex ClassRegex = new(@"(?:partial\s+)?class\s+([A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
     private static readonly Regex PropertyAssignRegex = new(@"(?<![.\w])(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*;", RegexOptions.Compiled);
     private static readonly Regex NewControlRegex = new(@"(?<![.\w])(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*new\s+([\w\.\[\],\s<>]+)\s*\(\s*\)\s*;", RegexOptions.Compiled);
     private static readonly Regex ControlsAddRegex = new(@"(?<![.\w])(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)?\s*\.?\s*Controls\.Add\s*\(\s*(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)(?:\s*,\s*(\d+)\s*,\s*(\d+))?\s*\)\s*;", RegexOptions.Compiled);
@@ -31,7 +31,7 @@ private static readonly Regex ColorSystemRegex = new(@"^System\.Drawing\.SystemC
     private static readonly Regex ColorKnownRegex = new(@"^System\.Drawing\.Color\.([A-Za-z_][A-Za-z0-9_]*)$", RegexOptions.Compiled);
     private static readonly Regex ColorArgbRegex = new(@"^System\.Drawing\.Color\.FromArgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$", RegexOptions.Compiled);
     private static readonly Regex ColorArgb3Regex = new(@"^System\.Drawing\.Color\.FromArgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$", RegexOptions.Compiled);
-    private static readonly Regex FieldDeclRegex = new(@"(?:private|protected|internal|public)\s+([\w\.\[\],\s<>]+)\s+([A-Za-z_][A-Za-z0-9_]*)\s*;", RegexOptions.Compiled);
+private static readonly Regex FieldDeclRegex = new(@"(?:(?:private|protected|internal|public|static|readonly)\s+)*([A-Za-z_][\w\.\[\],\s<>]*?)\s+([A-Za-z_][A-Za-z0-9_]*)\s*;", RegexOptions.Compiled);
     private static readonly Regex SizeFRegex = new(@"new\s+(?:System\.Drawing\.)?SizeF\s*\(\s*(-?\d+(?:\.\d+)?)(?:F)?\s*,\s*(-?\d+(?:\.\d+)?)(?:F)?\s*\)", RegexOptions.Compiled);
     private static readonly Regex FontRegex = new(@"new\s+(?:System\.Drawing\.)?Font\s*\(\s*""((?:[^""\\]|\\.)*)""\s*,\s*(\d+(?:\.\d+)?)(?:F)?\s*,\s*(?:System\.Drawing\.)?FontStyle\.([A-Za-z]+)(?:\s*,\s*(?:System\.Drawing\.)?GraphicsUnit\.([A-Za-z]+))?", RegexOptions.Compiled);
 
@@ -306,6 +306,23 @@ private static readonly Regex ColorSystemRegex = new(@"^System\.Drawing\.SystemC
             return filePath;
         }
 
+        // Old/single-file forms: if the selected file itself contains designer code, parse it.
+        if (File.Exists(filePath))
+        {
+            try
+            {
+                var source = File.ReadAllText(filePath);
+                if (LooksLikeDesignerSource(source))
+                {
+                    return filePath;
+                }
+            }
+            catch
+            {
+                // Ignore IO errors and fall through to paired designer lookup.
+            }
+        }
+
         var baseName = Path.GetFileNameWithoutExtension(filePath);
         var directory = Path.GetDirectoryName(filePath) ?? string.Empty;
         var candidates = new[]
@@ -315,6 +332,15 @@ private static readonly Regex ColorSystemRegex = new(@"^System\.Drawing\.SystemC
         };
 
         return candidates.FirstOrDefault(File.Exists);
+    }
+
+    private static bool LooksLikeDesignerSource(string source)
+    {
+        return source.Contains("InitializeComponent", StringComparison.Ordinal)
+            || source.Contains("Controls.Add", StringComparison.Ordinal)
+            || source.Contains("Controls.AddRange", StringComparison.Ordinal)
+            || source.Contains("new System.Windows.Forms.", StringComparison.Ordinal)
+            || source.Contains("new System.ComponentModel.", StringComparison.Ordinal);
     }
 
     private static void ApplyRootProperty(DesignDocument document, DesignNode root, string property, string value)
@@ -511,6 +537,7 @@ private static readonly Regex ColorSystemRegex = new(@"^System\.Drawing\.SystemC
     private static Type? ResolveType(string typeName)
     {
         var trimmed = typeName.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed)) return null;
         var clean = trimmed.Replace("global::", string.Empty, StringComparison.Ordinal)
             .Replace("[]", string.Empty, StringComparison.Ordinal)
             .Trim();

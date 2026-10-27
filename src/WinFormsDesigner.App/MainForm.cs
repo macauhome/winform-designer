@@ -595,12 +595,41 @@ private void BuildStatusBar()
 
     private void Save()
     {
+        if (TrySaveToOriginalFile())
+        {
+            FocusSurface();
+            return;
+        }
+
         GenerateCode();
+    }
+
+    private bool TrySaveToOriginalFile()
+    {
+        if (string.IsNullOrWhiteSpace(_currentFilePath) || !File.Exists(_currentFilePath))
+        {
+            return false;
+        }
+
+        try
+        {
+            var original = File.ReadAllText(_currentFilePath);
+            var patched = DesignerFileLoader.PatchSource(original, _session.Document);
+            File.WriteAllText(_currentFilePath, patched, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            _savedSignature = ComputeDocumentSignature(_session.Document);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Save", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return false;
+        }
     }
 
     private void GenerateCode()
     {
         using var dialog = new GenerateCodeDialog(_session.Document);
+
         if (dialog.ShowDialog(this) == DialogResult.OK)
         {
             _savedSignature = ComputeDocumentSignature(_session.Document);
@@ -678,6 +707,11 @@ private void BuildStatusBar()
 
         if (result == DialogResult.Yes)
         {
+            if (TrySaveToOriginalFile())
+            {
+                return true;
+            }
+
             using var dialog = new GenerateCodeDialog(_session.Document);
             if (dialog.ShowDialog(this) != DialogResult.OK)
             {

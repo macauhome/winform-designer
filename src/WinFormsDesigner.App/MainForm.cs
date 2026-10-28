@@ -595,13 +595,27 @@ private void BuildStatusBar()
 
     private void Save()
     {
-        if (TrySaveToOriginalFile())
+        if (string.IsNullOrWhiteSpace(_currentFilePath) || !File.Exists(_currentFilePath))
         {
-            FocusSurface();
+            GenerateCode();
             return;
         }
 
-        GenerateCode();
+        var result = MessageBox.Show(
+            this,
+            $"'{Path.GetFileName(_currentFilePath)}' already exists. Do you want to overwrite it?",
+            "Save",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question);
+        if (result != DialogResult.Yes)
+        {
+            return;
+        }
+
+        if (TrySaveToOriginalFile())
+        {
+            FocusSurface();
+        }
     }
 
     private bool TrySaveToOriginalFile()

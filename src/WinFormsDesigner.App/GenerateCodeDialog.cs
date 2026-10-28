@@ -188,6 +188,26 @@ internal sealed class GenerateCodeDialog : Form
             _document.OutputDirectory = folder;
 
             var generated = _generator.GenerateProject(_document);
+            var existing = generated.Files
+                .Select(f => Path.Combine(folder, f.Key))
+                .Where(File.Exists)
+                .ToList();
+            if (existing.Count > 0)
+            {
+                var result = MessageBox.Show(
+                    this,
+                    "The following file(s) already exist in the selected folder:" + Environment.NewLine
+                        + string.Join(Environment.NewLine, existing.Select(Path.GetFileName)) + Environment.NewLine + Environment.NewLine
+                        + "Do you want to overwrite them?",
+                    "Confirm overwrite",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question);
+                if (result != DialogResult.Yes)
+                {
+                    return;
+                }
+            }
+
             foreach (var (name, content) in generated.Files)
             {
                 var path = Path.Combine(folder, name);

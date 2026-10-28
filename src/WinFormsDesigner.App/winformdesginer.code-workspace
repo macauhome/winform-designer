@@ -1,0 +1,20 @@
+{
+	"folders": [
+		{
+			"path": "../.."
+		},
+		{
+			"name": "TextDefaults",
+			"path": "../../../../../../tmp/TextDefaults"
+		},
+		{
+			"name": "corecheck",
+			"path": "C:/temp/corecheck"
+		},
+		{
+			"name": "krinspect",
+			"path": "C:/temp/krinspect"
+		}
+	],
+	"settings": {}
+}

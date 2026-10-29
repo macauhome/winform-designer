@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("WinForms Designer")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2b91bd2756b862d7f88f10a22ca044e1520ef4af")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9c1c00a60fc44a2a0a65e9c72b77ba4a5ac50844")]
 [assembly: System.Reflection.AssemblyProductAttribute("WinForms Designer")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ParserSmoke")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

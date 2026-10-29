@@ -1,5 +1,9 @@
 using System.Globalization;
 using System.Reflection;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System.IO;
 using System.Text;
 using WinFormsDesigner.Core.Model;
 using WinFormsDesigner.Core.Reflection;
@@ -34,7 +38,7 @@ public sealed class CSharpFormGenerator
     private static readonly string[] AlwaysWrittenProperties = ["Name", "TabIndex", "Location", "Size"];
 
     /// <summary>Generates the source files for the given document.</summary>
-    public GeneratedForm Generate(DesignDocument document)
+    public GeneratedForm Generate(DesignDocument document, string? originalSource = null)
     {
         var nodes = document.Root.SelfAndDescendants().ToList();
         var fieldNames = BuildFieldNames(nodes);
@@ -49,10 +53,16 @@ public sealed class CSharpFormGenerator
         WriteDesignerFile(designer, document, nodes, fieldNames, tabIndices, images, imageKeys);
         WriteCodeBehindFile(codeBehind, document, nodes, fieldNames, tabIndices);
 
+        var generatedDesigner = designer.ToString();
+        if (!string.IsNullOrWhiteSpace(originalSource))
+        {
+            generatedDesigner = PatchDesignerSource(originalSource!, document);
+        }
+
         var files = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             [document.ClassName + ".cs"] = codeBehind.ToString(),
-            [document.ClassName + ".designer.cs"] = designer.ToString(),
+            [document.ClassName + ".designer.cs"] = generatedDesigner,
         };
 
         if (images.Count > 0)
@@ -67,6 +77,194 @@ public sealed class CSharpFormGenerator
             Files = files,
             ControlNames = nodes.Where(n => n.Parent is not null).Select(n => fieldNames[n]).ToArray(),
         };
+    }
+
+    /// <summary>
+    /// Generates only the statements that belong inside <c>InitializeComponent()</c>
+    /// (control instantiation, property assignment and layout) for the given document.
+    /// </summary>
+    public static string GenerateInitializeComponentBody(DesignDocument document)
+    {
+        var full = new CSharpFormGenerator().Generate(document).Files[document.ClassName + ".designer.cs"];
+        if (TryGetInitializeComponentSpan(full, out var open, out var close))
+        {
+            return full.Substring(open + 1, close - open - 1).Trim('\r', '\n').Trim();
+        }
+
+        return string.Empty;
+    }
+    public static string PatchDesignerSource(string originalSource, DesignDocument document)
+    {
+        if (string.IsNullOrWhiteSpace(originalSource))
+        {
+            return new CSharpFormGenerator().Generate(document).Files[document.ClassName + ".designer.cs"];
+        }
+
+        var newBody = GenerateInitializeComponentBody(document);
+        if (string.IsNullOrWhiteSpace(newBody))
+        {
+            return originalSource;
+        }
+
+        newBody = Environment.NewLine + newBody.Trim() + Environment.NewLine;
+
+        if (!TryGetInitializeComponentSpan(originalSource, out var originalOpen, out var originalClose))
+        {
+            return originalSource;
+        }
+
+        return originalSource.Substring(0, originalOpen + 1)
+            + newBody
+            + originalSource.Substring(originalClose);
+    }
+
+    /// <summary>
+    /// Generates the source files for the given document, loading and patching the original
+    /// designer file from disk when it already exists.
+    /// </summary>
+    public GeneratedForm GenerateFromFile(DesignDocument document, string originalFilePath)
+    {
+        string? originalSource = null;
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(originalFilePath) && File.Exists(originalFilePath))
+            {
+                originalSource = File.ReadAllText(originalFilePath);
+            }
+        }
+        catch
+        {
+            originalSource = null;
+        }
+
+        return Generate(document, originalSource);
+    }
+
+    /// <summary>
+    /// Locates the opening and closing braces of the <c>InitializeComponent</c> method,
+    /// skipping strings and comments. Returns false when the method cannot be found.
+    /// </summary>
+    private static bool TryGetInitializeComponentSpan(string source, out int openBrace, out int closeBrace)
+    {
+        openBrace = -1;
+        closeBrace = -1;
+
+        var nameIndex = source.IndexOf("InitializeComponent", StringComparison.Ordinal);
+        if (nameIndex < 0)
+        {
+            return false;
+        }
+
+        var length = source.Length;
+        for (var i = nameIndex; i < length; i++)
+        {
+            var c = source[i];
+            if (c == '"')
+            {
+                i++;
+                while (i < length)
+                {
+                    if (source[i] == '\\')
+                    {
+                        i += 2;
+                    }
+                    else if (source[i] == '"')
+                    {
+                        i++;
+                        break;
+                    }
+                    else
+                    {
+                        i++;
+                    }
+                }
+                i--;
+            }
+            else if (c == '/' && i + 1 < length && source[i + 1] == '/')
+            {
+                while (i < length && source[i] != '\n')
+                {
+                    i++;
+                }
+            }
+            else if (c == '/' && i + 1 < length && source[i + 1] == '*')
+            {
+                i += 2;
+                while (i + 1 < length && !(source[i] == '*' && source[i + 1] == '/'))
+                {
+                    i++;
+                }
+                i += 2;
+            }
+            else if (c == '{')
+            {
+                openBrace = i;
+                break;
+            }
+        }
+
+        if (openBrace < 0)
+        {
+            return false;
+        }
+
+        var depth = 0;
+        for (var i = openBrace; i < length; i++)
+        {
+            var c = source[i];
+            if (c == '"')
+            {
+                i++;
+                while (i < length)
+                {
+                    if (source[i] == '\\')
+                    {
+                        i += 2;
+                    }
+                    else if (source[i] == '"')
+                    {
+                        i++;
+                        break;
+                    }
+                    else
+                    {
+                        i++;
+                    }
+                }
+                i--;
+            }
+            else if (c == '/' && i + 1 < length && source[i + 1] == '/')
+            {
+                while (i < length && source[i] != '\n')
+                {
+                    i++;
+                }
+            }
+            else if (c == '/' && i + 1 < length && source[i + 1] == '*')
+            {
+                i += 2;
+                while (i + 1 < length && !(source[i] == '*' && source[i + 1] == '/'))
+                {
+                    i++;
+                }
+                i += 2;
+            }
+            else if (c == '{')
+            {
+                depth++;
+            }
+            else if (c == '}')
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    closeBrace = i;
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /// <summary>

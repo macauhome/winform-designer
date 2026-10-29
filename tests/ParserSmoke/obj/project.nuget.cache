@@ -1,11 +1,14 @@
 {
   "version": 2,
-  "dgSpecHash": "f8Gv/wvao1M=",
+  "dgSpecHash": "FdaB2zDY84M=",
   "success": true,
   "projectFilePath": "D:\\Ken\\Ken\\MyPrograms\\winformdesginer\\tests\\ParserSmoke\\ParserSmoke.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\macau\\.nuget\\packages\\krypton.ribbon\\105.26.7.201\\krypton.ribbon.105.26.7.201.nupkg.sha512",
-    "C:\\Users\\macau\\.nuget\\packages\\krypton.toolkit\\105.26.7.201\\krypton.toolkit.105.26.7.201.nupkg.sha512"
+    "C:\\Users\\macau\\.nuget\\packages\\krypton.toolkit\\105.26.7.201\\krypton.toolkit.105.26.7.201.nupkg.sha512",
+    "C:\\Users\\macau\\.nuget\\packages\\microsoft.codeanalysis.analyzers\\3.3.4\\microsoft.codeanalysis.analyzers.3.3.4.nupkg.sha512",
+    "C:\\Users\\macau\\.nuget\\packages\\microsoft.codeanalysis.common\\4.11.0\\microsoft.codeanalysis.common.4.11.0.nupkg.sha512",
+    "C:\\Users\\macau\\.nuget\\packages\\microsoft.codeanalysis.csharp\\4.11.0\\microsoft.codeanalysis.csharp.4.11.0.nupkg.sha512"
   ],
   "logs": []
 }

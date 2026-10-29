@@ -19,3 +19,5 @@ D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\obj\Debug\net10.0
 D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\obj\Debug\net10.0-windows\WinFormsDesigner.App.sourcelink.json
 D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\bin\Debug\net10.0-windows\Krypton.Ribbon.dll
 D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\bin\Debug\net10.0-windows\Krypton.Toolkit.dll
+D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\bin\Debug\net10.0-windows\Microsoft.CodeAnalysis.dll
+D:\Ken\Ken\MyPrograms\winformdesginer\src\WinFormsDesigner.App\bin\Debug\net10.0-windows\Microsoft.CodeAnalysis.CSharp.dll

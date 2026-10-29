@@ -1,8 +1,12 @@
 {
   "version": 2,
-  "dgSpecHash": "LtfP0x2Dl6Q=",
+  "dgSpecHash": "MuSGbxFLHMY=",
   "success": true,
   "projectFilePath": "D:\\Ken\\Ken\\MyPrograms\\winformdesginer\\src\\WinFormsDesigner.Core\\WinFormsDesigner.Core.csproj",
-  "expectedPackageFiles": [],
+  "expectedPackageFiles": [
+    "C:\\Users\\macau\\.nuget\\packages\\microsoft.codeanalysis.analyzers\\3.3.4\\microsoft.codeanalysis.analyzers.3.3.4.nupkg.sha512",
+    "C:\\Users\\macau\\.nuget\\packages\\microsoft.codeanalysis.common\\4.11.0\\microsoft.codeanalysis.common.4.11.0.nupkg.sha512",
+    "C:\\Users\\macau\\.nuget\\packages\\microsoft.codeanalysis.csharp\\4.11.0\\microsoft.codeanalysis.csharp.4.11.0.nupkg.sha512"
+  ],
   "logs": []
 }
